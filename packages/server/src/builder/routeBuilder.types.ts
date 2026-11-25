@@ -239,7 +239,7 @@ type HandlerResult<TRoute extends RouteDefinition> = MaybePromise<
  * The `respond` handlers and middleware receive: `respond()`, with `status`
  * limited to `TStatus`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#responses}
  */
 export type RouteRespond<TStatus extends number = number> = <
 	TBody,

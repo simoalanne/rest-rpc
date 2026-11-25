@@ -1,18 +1,13 @@
 ---
-title: Client Contract Extraction
-description: Extract a minimal runtime contract from your server routes.
+title: Contract Extraction
+description: Give a browser client your routes' types without bundling server code.
 ---
 
-When you can't import your server code directly, such as for a browser bundle,
-`extractContract()` gives the client a minimal runtime contract with the same types as your server routes.
+A client needs the routes' paths and types, but a browser bundle shouldn't
+include server code. `extractContract()` reduces the routes to plain data at
+build time. With a [shared contract](/docs/contract-first), skip this page.
 
-:::tip[Using Contract-First?]
-Import the [shared contract](/docs/contract-first) directly and skip this page.
-:::
-
-## Extract Routes with a Macro
-
-Run it as a bundler macro so the bundle gets plain JSON:
+## With a Macro
 
 ```ts contract.ts
 import { extractContract } from "@rest-rpc/core";
@@ -30,12 +25,8 @@ import { getContract } from "./contract.ts" with { type: "macro" };
 export const client = createClient(getContract());
 ```
 
-In a browser, the client calls the page's origin. Pass the
-[client options](/docs/client/fetch-client#client-options) for an API on
-another origin or under a mount path.
-
-Bun supports macros natively. For Vite, esbuild, Rolldown, Rollup, webpack or
-Rspack, use [`unplugin-macros`](https://github.com/unplugin/unplugin-macros):
+Bun runs macros natively. For Vite, esbuild, Rolldown, Rollup, webpack or
+Rspack, add [`unplugin-macros`](https://github.com/unplugin/unplugin-macros):
 
 ```ts vite.config.ts
 import Macros from "unplugin-macros/vite";
@@ -46,18 +37,17 @@ export default defineConfig({
 });
 ```
 
-`unplugin-macros` runs the macro in the runtime the bundler runs on, not through
-the bundler, so the bundler's path aliases don't apply to the macro import or to
-what `contract.ts` imports. Their imports follow the runtime's rules instead:
-Node needs the extension on every relative import, as it does for server code,
-while Bun also resolves imports without one. Importing `./contract.ts` works on
-both, and type-checks with `allowImportingTsExtensions` in the client's
+:::note
+The macro runs in Node or Bun, not the bundler, so path aliases don't apply
+to it or to what `contract.ts` imports. Write relative imports with their
+`.ts` extension, and enable `allowImportingTsExtensions` in the client's
 `tsconfig.json`.
+:::
 
-## Extract Routes without a Macro
+## Without a Macro
 
-For bundlers without macro support (e.g. Turbopack), write the contract to
-JSON in watch mode:
+For bundlers without macros, such as Turbopack, write the contract to a JSON
+file in watch mode:
 
 ```ts scripts/extract-contract.ts
 import { writeFile } from "node:fs/promises";
@@ -81,38 +71,23 @@ import { contractFromJson, createClient } from "@rest-rpc/core";
 import type { router } from "./router";
 import json from "./contract.json";
 
-export const client = createClient(contractFromJson<typeof router>(json), {
-	origin: "http://localhost:3000",
-});
+export const client = createClient(contractFromJson<typeof router>(json));
 ```
 
-A JSON import is typed by its values, or not at all, so `contractFromJson()`
-types it as the route tree it was extracted from, and throws when the file
-doesn't have the shape of an extracted contract. A macro returns the contract
-with its type, so only this setup needs the type import of the router.
+`contractFromJson()` gives the JSON the router's type, and throws if the file
+isn't an extracted contract.
 
-## What Extraction Runs
+## Things to Know
 
-Both ways import `router.ts` at build time, and with it every module it
-imports. Whatever those modules do when imported happens during the build too:
+:::warning[Extraction imports your server code]
+The build imports `router.ts` and everything it imports. A module that throws
+on import, such as one that checks environment variables, fails the build. One
+that opens a database connection or a timer keeps it from finishing. Create
+such services in the server and pass them as
+[context](/docs/middleware#context).
+:::
 
-- A module that throws, such as one that validates environment variables,
-  fails the build.
-- A module that keeps the process alive, such as one that opens a database
-  connection, starts a timer or listens on a port, keeps the macro or the
-  script from finishing.
-- Other side effects, such as writing log files, run in the build's working
-  directory.
-
-Keep these out of the modules routes import. Give handlers their services
-through [context](/docs/middleware#values-from-the-host) that the server
-creates, create them on first use, or share a [contract](/docs/contract-first)
-that imports no server code.
-
-## Limitations
-
-The extracted contract has no schemas, so the client can't
-[validate responses](/docs/client/fetch-client#response-validation), and
-routes with [inferred responses](/docs/route-builder#return-responses) accept
-any 2xx. If you need client-side validation, use a
-[shared contract](/docs/contract-first).
+- The extracted contract has no schemas, so the client can't validate
+  responses.
+- Routes with inferred responses accept any 2xx status on the client.
+- Use a [shared contract](/docs/contract-first) if you need either.

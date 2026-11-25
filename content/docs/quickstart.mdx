@@ -1,21 +1,11 @@
 ---
 title: Quickstart
-description: Define HTTP routes with handlers and call them through a typed client.
+description: Define routes, serve them, and call them from a typed client.
 ---
 
-A `rest-rpc` route is a plain HTTP endpoint and the source of its types: the
-handler's return value is what the typed client receives, and a call that
-doesn't match the route fails to compile.
-
-This guide uses Bun and Zod to build two routes: a minimal create operation
-and a GET with path params, query input, and a defined error. Their response
-types are inferred from the handlers.
-
-Same code runs on other fetch-native runtimes such as Deno and Cloudflare Workers.
-See [Serving Routes](/docs/server/overview) for the ways to serve the routes, on Fetch runtimes,
-on [Node](/docs/server/node), or from an existing [framework](/docs/server/framework-integration).
-
-## Install
+This builds two routes with Bun and Zod. The same code runs on Deno and
+Cloudflare Workers, and [Node](/docs/server/overview) with a different
+import.
 
 ```package-install
 npm i @rest-rpc/core @rest-rpc/server zod
@@ -30,18 +20,16 @@ import * as z from "zod";
 type Post = { id: string; title: string; body: string };
 const posts = new Map<string, Post>();
 
+// POST /posts/create
 const create = route
 	.body(z.object({ title: z.string().min(1), body: z.string() }))
 	.handler(({ body: { title, body } }) => {
-		const post: Post = {
-			id: crypto.randomUUID(),
-			title,
-			body,
-		};
+		const post: Post = { id: crypto.randomUUID(), title, body };
 		posts.set(post.id, post);
 		return post;
 	});
 
+// GET /posts/:id?preview=true
 const get = route
 	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
@@ -59,15 +47,10 @@ const get = route
 export const router = { posts: { create, get } };
 ```
 
-`posts.create` uses `POST /posts/create`, reads a JSON body, and returns the
-post as a 200 response. `posts.get` uses `GET /posts/:id?preview=true` and
-returns the post with status 200, or responds with the `POST_NOT_FOUND` error
-and status 404. The body is cut to 40 characters when `preview` is true.
+The schemas validate requests, and what the handler returns is what the
+client receives, typed.
 
-The request schemas validate inputs, and the handler's return value determines
-the client's result type.
-
-## Register Routes
+## Serve Them
 
 ```ts server.ts
 import { createApp } from "@rest-rpc/server";
@@ -76,15 +59,13 @@ import { router } from "./router.ts";
 export default createApp(router);
 ```
 
-Run it with `bun server.ts`, which serves it on port 3000. To add the routes to
-an existing framework instead, see
-[Framework Integration](/docs/server/framework-integration).
+Run `bun server.ts` to serve it on port 3000.
 
-## Create the Client
+## Call Them
 
-Extract a minimal contract from the routes with a
-[Bun macro](https://bun.com/docs/bundler/macros). The macro runs at bundle time
-and inlines the contract into the client, so no server code is shipped:
+The client needs the routes' types and paths, but not their server code.
+`extractContract()` runs as a [Bun macro](https://bun.com/docs/bundler/macros)
+at build time, so only plain data ends up in the client bundle:
 
 ```ts contract.ts
 import { extractContract } from "@rest-rpc/core";
@@ -94,11 +75,6 @@ export function getContract() {
 	return extractContract(router);
 }
 ```
-
-Vite and other bundlers run the same macro with `unplugin-macros`. See
-[Client Contract Extraction](/docs/client/contract-extraction#extract-routes-with-a-macro).
-
-## Call the Routes
 
 ```ts client.ts
 import { createClient, isDefinedError, safe } from "@rest-rpc/core";
@@ -126,16 +102,14 @@ if (!result.error) {
 }
 ```
 
-Calls reject with errors, and `safe()` returns them as values instead. See
-[Handle Errors](/docs/client/fetch-client#typesafe-error-handling).
-
-The calls are typed functions, while the requests still use the methods, URLs,
-query parameters, and statuses you defined. Other HTTP clients can call the same
-endpoints.
+For Vite and other bundlers, see
+[Contract Extraction](/docs/client/contract-extraction).
 
 ## Next Steps
 
-- [Route Builder](/docs/route-builder) covers defined responses, errors, content types, streams, and metadata.
-- [Fetch Client](/docs/client/fetch-client) covers client behavior and options.
-- [TanStack Query](/docs/client/tanstack-query) adds query and mutation utils.
-- [Contract-first Quickstart](/docs/contract-first-quickstart) builds the same API from a separately shared contract.
+- [Route Builder](/docs/route-builder): statuses, headers, raw and static
+  responses.
+- [Middleware and Context](/docs/middleware): authentication and shared logic.
+- [TanStack Query](/docs/client/tanstack-query): query and mutation options.
+- [Contract-first](/docs/contract-first): share a contract instead of
+  extracting one.

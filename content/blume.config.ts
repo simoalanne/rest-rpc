@@ -42,6 +42,7 @@ export default defineConfig({
 		repo: "rest-rpc",
 	},
 	navigation: {
+		sidebar: { display: "group" },
 		tabs: [
 			{ label: "Docs", path: "/docs", href: "/docs" },
 			{ label: "Changelog", path: "/changelog", href: "/changelog" },

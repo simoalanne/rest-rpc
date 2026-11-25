@@ -1,15 +1,12 @@
 ---
 title: Server-Sent Events
-description: Define and serve typed Server-Sent Event streams.
+description: Stream typed events from a route and read them on the client.
 ---
 
-Streaming routes send Server-Sent Events (SSE): each value a handler yields
-is one event, with the value as JSON in its `data` field.
+A handler that returns an async iterable streams Server-Sent Events. Each
+yielded value is one event, sent as JSON.
 
-## Define a Stream
-
-Returning an async iterable infers a stream. Define a response with
-`sse(schema)` when you want to define and validate its data schema.
+## Send Events
 
 ```ts
 import { route, sse } from "@rest-rpc/server";
@@ -23,37 +20,52 @@ const notifications = route
 	});
 ```
 
-The schema passed to `sse()` describes the data of each event. A status
-defines either a stream or another body.
+- `.response(sse(schema))` is optional. Without it, the event type is inferred
+  from what the handler yields, and events aren't validated.
+- A status is either a stream or a regular body, not both.
 
-Throw a [defined error](/docs/route-builder#define-errors) before the stream
-starts to respond with an error instead:
+## Read Events
+
+The response `body` is an async iterable of events:
 
 ```ts
-const notifications = route
-	.get("/notifications")
-	.headers(z.object({ authorization: z.string() }))
-	.response(sse(z.object({ postId: z.string(), message: z.string() })))
-	.error("UNAUTHORIZED", { status: 401 })
-	.handler(({ headers, errors }) => {
-		if (!authorize(headers.authorization)) throw errors.UNAUTHORIZED();
-		return streamNotifications();
-	});
+const response = await client.notifications();
+
+if (response.status === 200) {
+	for await (const event of response.body) {
+		console.log(event.data.message);
+	}
+}
 ```
 
-Stream schemas describe event data. Event data is sent as JSON, so it must be
-JSON serializable unless you set a [data format](#data-format). Defined schemas validate each value as it is yielded. Once the stream
-started, an invalid value or an error the handler throws ends the stream
-instead of sending an error response, and
-[`onError`](/docs/server/interceptors#reporting-errors) reports it.
+```ts
+type SseEvent<T> = {
+	/** The yielded value. */
+	data: T;
+	/** The last event ID: this event's `id`, or the previous one's. */
+	id?: string;
+	/** The event name. */
+	event?: string;
+	/** The reconnection time the server suggests, in milliseconds. */
+	retry?: number;
+};
+```
 
-## Add Event Metadata
-
-Yield data directly when an event does not need metadata. Use `sseEvent()` to
-add an event ID, event name, or retry hint:
+Pass a `signal` to cancel the request and the stream:
 
 ```ts
-import { route, sseEvent } from "@rest-rpc/server";
+const controller = new AbortController();
+const response = await client.notifications(undefined, {
+	signal: controller.signal,
+});
+```
+
+## Event IDs and Names
+
+Yield `sseEvent()` to give an event an `id`, a name or a retry hint:
+
+```ts
+import { sseEvent } from "@rest-rpc/server";
 
 const notifications = route.get("/notifications").handler(async function* () {
 	yield { postId: "post_1", message: "Ada liked your post" };
@@ -64,94 +76,118 @@ const notifications = route.get("/notifications").handler(async function* () {
 });
 ```
 
-`sseEvent()` throws when `id` or `event` contain line breaks, or when `retry` is not
-a non-negative integer number of milliseconds.
+`sseEvent()` throws when `id` or `event` contains a line break, or `retry`
+isn't a whole number of milliseconds.
 
-## Data Format
+## Errors
 
-Event data is JSON by default. Define another format with `sseFormat()`, and
-pass the same format to the server and the client in their `sse` option:
-
-```ts
-import { sseFormat } from "@rest-rpc/server";
-
-const superjsonEvents = sseFormat({
-	serialize: (data) => superjson.stringify(data), // may span several lines
-	deserialize: (data) => superjson.parse(data),
-});
-
-createApp(router, { sse: { format: superjsonEvents } });
-createClient(getContract(), { origin, sse: { format: superjsonEvents } });
-```
-
-Data that spans several lines is sent as one `data` field per line, and the
-client joins them with `\n` before `deserialize` reads them. A format changes
-how data is sent, not its types. Streams don't use
-[body codecs](/docs/http-behavior/encoding#codecs), so a format is the only way
-to change how event data is encoded.
-
-## Stream Options
-
-Servers, proxies and load balancers may close a connection that has been idle
-for a while, or buffer the start of a response. Comments, which clients ignore,
-keep the stream moving. Set `keepAlive` lower than your server's idle timeout,
-if it has one:
-
-```ts
-createApp(router, {
-	sse: {
-		keepAlive: 5_000, // a ": keepalive" comment after 5 s without an event
-		initialComment: true, // a ": ok" comment right after the headers
-	},
-});
-```
-
-Both are off by default. A `respond()` call's `sse` option overrides them for
-its stream:
+Throw a defined error before the stream starts to send an error response:
 
 ```ts
 const notifications = route
 	.get("/notifications")
-	.handler(({ respond }) =>
-		respond(streamNotifications(), { sse: { keepAlive: 2_000 } }),
-	);
+	.response(sse(z.object({ postId: z.string(), message: z.string() })))
+	.error("UNAUTHORIZED", { status: 401 })
+	.handler(({ context, errors }) => {
+		if (!context.user) throw errors.UNAUTHORIZED();
+		return streamNotifications(context.user);
+	});
 ```
 
-The option is ignored when the body isn't a stream. The keepalive timer starts
-again after each event, and stops when the stream ends or the client
-disconnects.
+:::warning
+Once the first event is sent, the status can't change. An error thrown
+during the stream, or an event that fails validation, ends the stream instead,
+and the client's loop throws. [`onError`](/docs/server/interceptors#report-errors)
+reports it on the server.
+:::
 
-## Stop a Stream
+## Stop and Resume
 
-The handler's `signal` aborts when the client disconnects. Use it to stop
-producing events and release resources:
-
-```ts
-const notifications = route.get("/notifications").handler(async function* ({
-	signal,
-}) {
-	while (!signal.aborted) {
-		yield await nextNotification({ signal });
-	}
-});
-```
-
-## Resume a Stream
-
-A client that reconnects can send the `Last-Event-ID` header. rest-rpc does not
-resume streams itself, so read the header like any other request header with
-`.headers()`:
+The handler's `signal` aborts when the client disconnects:
 
 ```ts
 const notifications = route
 	.get("/notifications")
 	.headers(z.object({ "last-event-id": z.string().optional() }))
-	.handler(({ headers }) =>
-		streamNotifications({ after: headers["last-event-id"] }),
-	);
+	.handler(async function* ({ headers, signal }) {
+		let after = headers["last-event-id"];
+		while (!signal.aborted) {
+			const notification = await nextNotification({ after, signal });
+			after = notification.id;
+			yield sseEvent(notification, { id: notification.id });
+		}
+	});
 ```
 
-To resume streams the same way across routes, read the header in the host and
-[seed the context](/docs/middleware#values-from-the-host) with it instead.
+The client doesn't reconnect by itself. To resume, call the route again with
+the last event ID:
 
-Give events an `id` with `sseEvent()` so clients have a value to resume from.
+```ts
+let lastEventId: string | undefined;
+let retryMs = 3_000;
+
+while (!controller.signal.aborted) {
+	try {
+		const response = await client.notifications(
+			{ headers: { "last-event-id": lastEventId } },
+			{ signal: controller.signal },
+		);
+		for await (const event of response.body) {
+			lastEventId = event.id;
+			retryMs = event.retry ?? retryMs;
+			handleNotification(event.data);
+		}
+	} catch (error) {
+		if (controller.signal.aborted) break;
+		if (error instanceof RouteError && error.status < 500) throw error;
+	}
+	await new Promise((resolve) => setTimeout(resolve, retryMs));
+}
+```
+
+## Stream Options
+
+Proxies and servers may close a connection that's quiet for too long. Pass
+`sse` options to the server:
+
+```ts
+createApp(router, {
+	sse: { keepAlive: 5_000, initialComment: true },
+});
+```
+
+```ts
+type SseOptions = {
+	/**
+	 * Sends a comment after this many milliseconds without an event. Set it
+	 * lower than your server's idle timeout. Off by default.
+	 */
+	keepAlive?: number;
+	/** Sends a comment right after the headers. Off by default. */
+	initialComment?: boolean;
+	/** How event data is encoded. JSON by default. */
+	format?: SseFormat;
+};
+```
+
+`respond(stream, { sse })` overrides them for one stream.
+
+### Data Format
+
+Event data is JSON by default. To send values JSON can't, such as `Date`, use
+another format, and pass the same one to the server and the client:
+
+```ts
+import { sseFormat } from "@rest-rpc/server";
+
+const superjsonEvents = sseFormat({
+	serialize: (data) => superjson.stringify(data),
+	deserialize: (data) => superjson.parse(data),
+});
+
+createApp(router, { sse: { format: superjsonEvents } });
+createClient(getContract(), { sse: { format: superjsonEvents } });
+```
+
+Streams don't use [body codecs](/docs/http-behavior/encoding), so a format is
+the only way to change how events are encoded.

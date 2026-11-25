@@ -20,7 +20,7 @@ import { respondTo } from "./response.ts";
 /**
  * Customizes the routes, request parsing and interceptors of an app.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#app-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#options}
  */
 export type CreateAppOptions<
 	TArgs extends unknown[] = [],
@@ -61,7 +61,7 @@ export type AppContext<TArgs extends unknown[], TContext extends object> =
  * Bun, Deno and Cloudflare Workers, serve it as is. Spread it into
  * `Bun.serve()` to set other server options.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#create-an-app}
  */
 export type App<TArgs extends unknown[] = []> = {
 	/**
@@ -101,7 +101,7 @@ export type App<TArgs extends unknown[] = []> = {
  * {@link createCatchAllHandler} instead to serve the routes from an existing
  * server or framework.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#create-an-app}
  */
 export function createApp<
 	TRouter extends RuntimeImplementationTree<EmptyObject>,
@@ -114,7 +114,7 @@ export function createApp<
  * Creates a Fetch app that serves a route tree whose routes require initial
  * context, so `context` is required.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#create-an-app}
  */
 export function createApp<
 	TRouter extends RuntimeImplementationTree,

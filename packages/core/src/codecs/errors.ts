@@ -19,7 +19,7 @@ const describeValue = (value: unknown): string => {
  * @remarks It extends `TypeError`. The JSON codec throws the errors of
  * `JSON.stringify` instead.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#serialization-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs}
  */
 export class BodySerializationError extends TypeError {
 	/**

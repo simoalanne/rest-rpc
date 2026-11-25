@@ -107,7 +107,7 @@ export const intercept = (
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#sending-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#errors}
  */
 export function errorResponse(error: unknown): Response {
 	return toFetchResponse(serializeRouteErrorParts(asRouteError(error)));
@@ -140,7 +140,7 @@ const isEventStream = (response: Response) =>
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#reporting-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#report-errors}
  */
 export function onError(
 	callback: (

@@ -95,7 +95,7 @@ export const compileNodeRoutes = (
 /**
  * A Node route handler ready to be registered on a framework's router.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#route-handlers}
  */
 export type NodeRoute<TContext extends object = EmptyObject> = {
 	readonly method: HttpMethod;
@@ -125,7 +125,7 @@ export type NodeRouteHandlerResult = { matched: boolean };
  * Customizes the routes, request parsing and interceptors of Node route
  * handlers and the catch-all handler.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#interceptors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#errors-and-interceptors}
  */
 export type NodeRouteHandlersOptions = CreateRouteHandlersOptions & {
 	/**
@@ -170,7 +170,7 @@ const toNodeRoutes = (
  * other thrown values, for the framework's error handling. Use
  * {@link createCatchAllHandler} to let rest-rpc do the routing instead.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#route-handlers}
  */
 export function createRouteHandlers<TRouter extends RuntimeImplementationTree>(
 	router: TRouter,

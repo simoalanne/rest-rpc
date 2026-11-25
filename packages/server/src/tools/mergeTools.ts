@@ -119,7 +119,7 @@ const createCallTool = <TContext extends object>(
  * named and described as. Tool names identify the tools, so two with the same
  * name throw.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#merge-tools}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools#merge-tools}
  */
 export function mergeTools<TContext extends object = EmptyObject>(
 	tools: readonly AgentTool<TContext>[],

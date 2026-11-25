@@ -16,7 +16,7 @@ type ClientRoute = (...args: never[]) => Promise<unknown>;
 /**
  * A client tree created with `createClient`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query}
  */
 export type TanstackQueryClient =
 	| ClientRoute

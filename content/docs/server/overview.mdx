@@ -1,41 +1,24 @@
 ---
 title: Serving Routes
-description: Choose how much of each request rest-rpc handles, on Fetch or Node
+description: Serve routes with any framework or none, on Fetch runtimes or Node.
 ---
 
-`@rest-rpc/server` serves routes with Fetch `Request` and `Response`, on
-runtimes such as Bun, Deno and Cloudflare Workers. `@rest-rpc/server/node`
-serves them with Node's `IncomingMessage` and `ServerResponse`, reading and
-writing them directly. Both export the same functions, and routes behave the
-same on both.
+Routes don't depend on how they're served, so any framework or none works,
+and switching later doesn't change them:
 
-```package-install
-npm i @rest-rpc/server
-```
+- **`createApp`**: no framework. Covered on this page.
+- **Catch-all handler**: a framework serves the requests under one of its
+  routes, such as `/api/*`.
+- **Route handlers**: each route is registered on the framework's router, so
+  its middleware can apply per route.
 
-## Choosing a Level
+See [Framework Integration](/docs/server/framework-integration) for the last
+two.
 
-The functions differ in how much of each request rest-rpc handles:
+## Create an App
 
-|                     | `createRouteHandlers`                       | `createCatchAllHandler`               | `createApp`                           |
-| ------------------- | ------------------------------------------- | ------------------------------------- | ------------------------------------- |
-| Routing             | The framework, one route per rest-rpc route | rest-rpc, under one framework route   | rest-rpc                              |
-| Unmatched requests  | Not routed to rest-rpc                      | Left to the host, as `matched: false` | A `NOT_FOUND` error                   |
-| Other thrown errors | Reject, for the host to handle              | Reject, for the host to handle        | `INTERNAL_SERVER_ERROR`               |
-| Initial context     | Per request                                 | Per request                           | A value, or a function of the request |
-| Returns             | Routes to register                          | A handler to mount                    | The handler the runtime calls         |
-
-- Use [`createApp`](#create-app) when rest-rpc serves every request.
-- Use the [catch-all handler](/docs/server/framework-integration#catch-all-handler)
-  to add the routes to a framework under one route, such as `/api/*`.
-- Use [route handlers](/docs/server/framework-integration#native-router) when
-  the framework should see each route, such as to apply its middleware per
-  route.
-
-### Create App
-
-`createApp` returns the function the runtime calls for each request, and
-doesn't start a server:
+<Tabs>
+<Tab title="Bun, Deno, Workers">
 
 ```ts server.ts
 import { createApp } from "@rest-rpc/server";
@@ -44,43 +27,97 @@ import { router } from "./router.ts";
 export default createApp(router);
 ```
 
-See [Fetch](/docs/server/fetch) and [Node](/docs/server/node) for each
-runtime, and [Framework Integration](/docs/server/framework-integration) for
-the other two.
+</Tab>
+<Tab title="Node">
 
-## Route Options
+```ts server.ts
+import { createServer } from "node:http";
+import { createApp } from "@rest-rpc/server/node";
+import { router } from "./router.ts";
 
-Every function takes these options after the route tree:
+createServer(createApp(router)).listen(3000);
+```
+
+</Tab>
+</Tabs>
+
+- [Errors](/docs/errors) are sent as error responses, and anything else thrown
+  as `INTERNAL_SERVER_ERROR`.
+- Requests that match no route get `NOT_FOUND`.
+- On Node, a response that already started, such as a stream that fails, is
+  closed instead.
+
+### Bun
+
+The app is `{ fetch, routes }`, which Bun serves as a default export, using
+its own router for `routes`. To set other Bun options, spread it:
 
 ```ts
-type CreateRouteHandlersOptions = {
-	/** Codecs for other body formats, selected before the built-in ones. */
+const app = createApp(router);
+
+Bun.serve({
+	...app,
+	port: 8080,
+	routes: { ...app.routes, "/health": new Response("ok") },
+});
+```
+
+### Node
+
+`createApp` from `@rest-rpc/server/node` returns a request listener for
+`http.createServer()` or `https.createServer()`.
+
+:::warning
+The Node app reads request bodies whole, with no size limit. Limit them in
+front of it, such as in a proxy.
+:::
+
+## Options
+
+```ts
+type CreateAppOptions = {
+	/**
+	 * The path the routes are served under, such as `/api`. Clients take the
+	 * same `mountPath`.
+	 */
+	mountPath?: `/${string}`;
+	/**
+	 * The initial context the routes require, or a function that returns it
+	 * for each request. Required when any route declares initial context.
+	 */
+	context?:
+		| TContext
+		| ((request: Request, ...args: TArgs) => TContext | Promise<TContext>);
+	/** Functions around every request. See Interceptors. */
+	interceptors?: readonly Interceptor[];
+	/** Codecs for other body formats. See Content Types and Codecs. */
 	bodyCodecs?: readonly BodyCodec[];
 	/** Skips request validation. The types stay as if the schemas ran. */
 	disableRequestValidation?: boolean;
 	/** Skips response validation. The types stay as if the schemas ran. */
 	disableResponseValidation?: boolean;
-	/** The data format, keepalive and initial comment of event streams. */
+	/** Keepalive and data format of event streams. See Server-Sent Events. */
 	sse?: SseOptions;
 };
 ```
 
-See [Custom Codecs](/docs/http-behavior/encoding#custom-codecs) for `bodyCodecs`,
-[Disabling Validation](/docs/http-behavior/validation#disabling-validation) for
-the validation options, and [Data Format](/docs/server-sent-events#data-format) and
-[Stream Options](/docs/server-sent-events#stream-options) for `sse`.
+On Node, the `context` function receives the `IncomingMessage`. On Fetch
+runtimes, it also receives what the runtime passes after the request, such as
+Cloudflare Workers' `env`:
+
+```ts
+export default createApp(router, {
+	context: (request, env: Env) => ({ db: env.DB }),
+}) satisfies ExportedHandler<Env>;
+```
 
 ## Paths
 
-Path params are written as `:name`. Matching follows
-[rou3](https://github.com/h3js/rou3): static segments take precedence over
-params, and one trailing slash is ignored. Param values are percent-decoded.
+- Path params are written `:name`, and their values are percent-decoded.
+- Static segments match before params, so `/posts/latest` wins over
+  `/posts/:id`.
+- One trailing slash is ignored.
 
-### Mount Path
-
-`createApp` and the catch-all handler take a `mountPath`, such as `/api`, to
-serve the routes under. Requests outside it are unmatched, and it is removed
-from the request path before matching. Route paths do not include it, so
-clients pass the same `mountPath`. A path that clients and OpenAPI documents
-should include in each route, such as `/v1`, belongs in the routes instead,
-defined with [`.prefix()`](/docs/route-builder#path-prefixes).
+`mountPath` is removed before matching, and isn't part of the routes. A path
+that clients and OpenAPI should see on every route, such as `/v1`, belongs in
+the routes as a [prefix](/docs/route-builder#stacking-calls).

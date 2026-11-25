@@ -6,7 +6,7 @@
  * type. Promise methods and `async` functions return plain promises, which
  * drop it; annotate wrappers with `ClientPromise` to keep it.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#handle-errors-on-the-client}
  */
 export type ClientPromise<TData, TError> = Promise<TData> & {
 	readonly "~error"?: TError;
@@ -18,7 +18,7 @@ export type ClientPromise<TData, TError> = Promise<TData> & {
  * @remarks Check `error` before reading `data`, which is typed only after
  * that check.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#with-safe}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#with-safe}
  */
 export type SafeResult<TData, TError> =
 	| { readonly error: TError; readonly data?: undefined }
@@ -40,7 +40,7 @@ export type SafeResult<TData, TError> =
  * }
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#with-safe}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#with-safe}
  */
 export function safe<TData, TError = unknown>(
 	promise: ClientPromise<TData, TError>,

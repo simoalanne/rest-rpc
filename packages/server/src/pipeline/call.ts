@@ -115,7 +115,7 @@ const callRoute = async (
  * sent, marked as defined when the route defines its code. Other errors
  * thrown by the handler reject unchanged.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/local-calls#call-a-route}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/local-calls}
  */
 export function call<TRoute extends ImplementedRoute>(
 	route: TRoute,

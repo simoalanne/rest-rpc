@@ -36,7 +36,7 @@ export type JsonValue =
 /**
  * Hints about a tool's behavior, the `annotations` of an MCP tool.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#tool-definitions}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools#tools}
  */
 export type ToolAnnotations = {
 	/** A human-readable title of the tool. */
@@ -55,7 +55,7 @@ export type ToolAnnotations = {
  * A tool definition, shaped like the MCP `Tool` of protocol revision
  * 2026-07-28.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#tool-definitions}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools#tools}
  */
 export type ToolDefinition = {
 	/** The name the model calls the tool by. */
@@ -76,7 +76,7 @@ export type ToolDefinition = {
  * The result of a tool call, shaped like the MCP `CallToolResult` of protocol
  * revision 2026-07-28.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#results-and-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools#results}
  */
 export type ToolResult = {
 	/** The body as text: a string as it is, and other values as JSON. The error as JSON when `isError` is set. Empty when there is no body. */
@@ -91,7 +91,7 @@ export type ToolResult = {
  * Options of a tool call. `context` is required when the routes require
  * initial context.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#context-and-headers}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools#serve-over-mcp}
  */
 export type ToolCallOptions<TContext extends object = EmptyObject> =
 	ContextOption<TContext> & {
@@ -107,10 +107,10 @@ export type ToolCallOptions<TContext extends object = EmptyObject> =
 /**
  * A tool: its definition and a function that calls it.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools}
  */
 export type AgentTool<TContext extends object = EmptyObject> = {
-	/** The tool definition, as registered with an MCP server or agent framework. */
+	/** The tool definition, as registered with an MCP server or agent SDK. */
 	definition: ToolDefinition;
 	/**
 	 * Calls the tool with the arguments a model sent, and resolves with the
@@ -125,7 +125,7 @@ export type AgentTool<TContext extends object = EmptyObject> = {
 /**
  * Options of `createToolsFromRoutes()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#options}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools#options}
  */
 export type CreateToolsFromRoutesOptions = {
 	/**
@@ -332,7 +332,7 @@ const createCall =
 
 /**
  * Creates a tool for each route in a route tree, to register with an MCP
- * server or an agent framework. Calls run through the route's validation and
+ * server or an agent SDK. Calls run through the route's validation and
  * middleware without HTTP.
  *
  * @remarks Tool arguments and results are JSON, so routes with streamed or
@@ -341,7 +341,7 @@ const createCall =
  * its key path joined with `_`, and two routes whose names are the same throw
  * when the tools are created.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/mcp-tools}
  */
 export function createToolsFromRoutes<
 	TRouter extends RuntimeImplementationTree,

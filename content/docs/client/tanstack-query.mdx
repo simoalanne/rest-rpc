@@ -1,48 +1,125 @@
 ---
 title: TanStack Query
-description: Create typed TanStack Query utils from a client and combine them with your TanStack Query setup.
+description: Typed query and mutation options for TanStack Query.
 ---
-
-## Install
 
 ```package-install
 npm i @rest-rpc/tanstack-query
 ```
 
-## Setup
-
-`createTanstackQueryUtils()` takes a client created with
-[`createClient()`](/docs/client/fetch-client). It returns a util tree with the
-same shape as the client, whose utils call the client's routes. The utils create
-options objects and keys; they do not create a `QueryClient` or call hooks.
+`createTanstackQueryUtils()` takes a client and returns utils of the same
+shape, which create TanStack Query options and keys:
 
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { getContract } from "./contract.ts" with { type: "macro" };
 
-export const client = createClient(getContract(), {
-	origin: "https://api.example.com",
-});
+export const client = createClient(getContract());
 export const queryUtils = createTanstackQueryUtils(client);
 ```
 
-The same client can still be called directly where a query is not needed.
+## Queries and Mutations
 
-```ts
-type TanstackQueryUtilsOptions = {
-	/**
-	 * Keys that start every query and mutation key of the utils, such as
-	 * values sent with every request that change its response.
-	 */
-	prefix?: QueryKey;
-};
+```tsx
+const post = useQuery(
+	queryUtils.posts.get.queryOptions({
+		request: { params: { id: "post_1" } },
+		select: (response) => response.body,
+	}),
+);
+
+const create = useMutation(
+	queryUtils.posts.create.mutationOptions({
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: queryUtils.posts.list.key() }),
+	}),
+);
+
+create.mutate({ body: { title: "Hello", body: "First post" } });
 ```
 
-A [query key](#query-keys) holds the route and its request, not what the client
-adds to every request. When such a value changes the response, such as a locale
-sent in `globalHeaders`, pass it as the `prefix`, so queries for different values
-don't share cache entries:
+- The query's data is the whole response, so `select` reads its `body`.
+- Options take any TanStack Query option, plus `fetchOptions` for the
+  client's [per-call options](/docs/client/fetch-client#per-call-options).
+  TanStack Query passes the `signal` itself.
+- Pass `skipToken` as `request` to disable a query, typed.
+- `error` is typed like [`safe()`](/docs/errors#with-safe)'s, so narrow it
+  with `isDefinedError()`.
+
+## Infinite Queries
+
+`request` maps each page param to the request for that page:
+
+```tsx
+const posts = useInfiniteQuery(
+	queryUtils.posts.feed.infiniteQueryOptions({
+		request: (cursor: string | undefined) => ({
+			query: { cursor, limit: 50 },
+		}),
+		initialPageParam: undefined,
+		getNextPageParam: (lastPage) => lastPage.body.nextCursor,
+	}),
+);
+```
+
+## Streamed Queries
+
+`streamedQueryOptions()` collects a [stream's](/docs/server-sent-events)
+events, using TanStack Query's experimental `streamedQuery`:
+
+```tsx
+const events = useQuery(queryUtils.notifications.streamedQueryOptions());
+events.data; // SseEvent<{ postId: string; message: string }>[] | undefined
+
+const messages = useQuery(
+	queryUtils.notifications.streamedQueryOptions({
+		initialValue: "",
+		reducer: (text, event) => `${text}${event.data.message}`,
+	}),
+);
+messages.data; // string | undefined
+```
+
+## Query Keys
+
+`key()` matches every query under a node, to invalidate them:
+
+```ts
+queryClient.invalidateQueries({ queryKey: queryUtils.key() }); // everything
+queryClient.invalidateQueries({ queryKey: queryUtils.posts.key() }); // every posts route
+queryClient.invalidateQueries({ queryKey: queryUtils.posts.get.key() }); // every posts.get query
+```
+
+`queryKey()`, `infiniteQueryKey()`, `streamedQueryKey()` and `mutationKey()`
+give one query's key, typed with its data:
+
+```ts
+const postKey = queryUtils.posts.get.queryKey({ params: { id: "post_1" } });
+// ["posts", "get", { params: { id: "post_1" } }]
+
+queryClient.setQueryData(postKey, (current) =>
+	current?.status === 200
+		? { ...current, body: { ...current.body, title: "Edited" } }
+		: current,
+);
+```
+
+- A key is the route's path in the tree, then the request.
+- Without a request, they return the key of every query of that kind for the
+  route.
+- Pass `queryKey` in the options to use your own key instead.
+
+:::error[Reserved key]
+`key` can't be a route or group name in a client passed to
+`createTanstackQueryUtils()`. Using it is a type error.
+:::
+
+### Key Prefix
+
+Keys hold the route and request, not what the client adds to every request.
+When such a value changes responses, such as a locale header, add it to every
+key with `prefix`, so different values don't share cache entries:
 
 ```ts
 const createQueryUtils = (locale: string) =>
@@ -54,283 +131,12 @@ const createQueryUtils = (locale: string) =>
 	);
 ```
 
-## Queries
+## Direct Calls
 
-Use `queryOptions()` to create a typed TanStack Query options object for a route.
-The util accepts request input, Fetch options, and TanStack Query options in one object.
-
-```tsx
-import { useQuery } from "@tanstack/react-query";
-
-const post = useQuery(
-	queryUtils.posts.get.queryOptions({
-		request: {
-			params: { id: "post_1" },
-		},
-		select: (response) => response.body,
-	}),
-);
-```
-
-The query's data is the response envelope, so `select` reads its `body`.
-
-## Infinite Queries
-
-Use `infiniteQueryOptions()` when each page should be fetched with route
-request input. The query key includes the request of the initial page, so every
-page shares one cache entry while queries with different input, such as another
-`status` below, are cached separately.
-
-`initialPageParam` and the values returned by `getNextPageParam` describe
-pagination state. The `request` callback maps each page parameter to the route
-request used for its API call.
-
-```tsx
-import { useInfiniteQuery } from "@tanstack/react-query";
-
-const posts = useInfiniteQuery(
-	queryUtils.posts.feed.infiniteQueryOptions({
-		request: (cursor: string | undefined) => ({
-			query: { cursor, status: "open", limit: 50 },
-		}),
-		initialPageParam: undefined,
-		getNextPageParam: (lastPage) => lastPage.body.nextCursor,
-	}),
-);
-```
-
-## Streamed Queries
-
-Use `streamedQueryOptions()` for routes with one successful stream response,
-defined with `.response(sse(schema))` or inferred from a handler that returns an
-async iterable. The util passes the envelope's async iterable body to TanStack
-Query and stores the materialized stream data.
-
-:::note
-`streamedQueryOptions()` is based on TanStack Query's experimental
-[`streamedQuery`](https://tanstack.com/query/latest/docs/framework/react/reference/functions/experimental_streamedQuery)
-API.
-:::
-
-```tsx
-import { useQuery } from "@tanstack/react-query";
-
-const events = useQuery(queryUtils.notifications.streamedQueryOptions());
-```
-
-By default, SSE events accumulate into an array.
-
-```ts
-events.data;
-// Array<SseEvent<{ postId: string; message: string }>> | undefined
-```
-
-Pass `initialValue` and `reducer` when you want a different accumulated data
-shape.
-
-```tsx
-const messages = useQuery(
-	queryUtils.notifications.streamedQueryOptions({
-		initialValue: "",
-		reducer: (text, event) => `${text}${event.data.message}`,
-	}),
-);
-
-messages.data;
-// string | undefined
-```
-
-`refetchMode` is passed to `streamedQuery` and controls how a refetch treats
-existing data. See [Fetch Client](/docs/client/fetch-client#consume-streams) for
-the event shape.
-
-## Skipping Queries
-
-To disable a query in type-safe way you can use `skipToken` as request input.
-
-```tsx
-import { skipToken } from "@tanstack/query-core";
-
-const post = useQuery(
-	queryUtils.posts.get.queryOptions({
-		request: selectedId ? { params: { id: selectedId } } : skipToken,
-	}),
-);
-```
-
-For infinite queries, pass `skipToken` instead of the `request` callback.
-
-```tsx
-const posts = useInfiniteQuery(
-	queryUtils.posts.feed.infiniteQueryOptions({
-		request: status
-			? (cursor: string | undefined) => ({ query: { cursor, status } })
-			: skipToken,
-		initialPageParam: undefined,
-		getNextPageParam: (lastPage) => lastPage.body.nextCursor,
-	}),
-);
-```
-
-## Query Keys
-
-Query keys are the [prefix](#setup), if any, and the route's key path in the
-route tree, followed by the request input when there is one. Infinite and
-streamed queries cache different data than regular queries, so their keys add a
-`"~infinite"` or `"~streamed"` segment after the route path.
-
-Use `key()` to match queries in TanStack Query filters, such as to invalidate
-them. Every node of the util tree has it: the root's matches every query of the
-utils, a group's every query of its routes, and a route's every query of the
-route, of every kind.
-
-```ts
-await queryClient.invalidateQueries({ queryKey: queryUtils.key() });
-await queryClient.invalidateQueries({ queryKey: queryUtils.posts.key() });
-await queryClient.invalidateQueries({ queryKey: queryUtils.posts.get.key() });
-```
-
-:::error[Reserved Keys]
-Don't use `key` as a route or group key of a client passed to `createTanstackQueryUtils()`. It is reserved for `key()`, and using it is a type error.
-:::
-
-Use `queryKey()`, `infiniteQueryKey()` and `streamedQueryKey()` for the key of
-one query, such as to read or update its data. They are typed with the query's
-data for TanStack Query APIs.
-
-```ts
-queryUtils.posts.get.queryKey({ params: { id: "post_1" } }); // ["posts", "get", { params: { id: "post_1" } }]
-queryUtils.posts.list.queryKey(); // ["posts", "list"]
-
-// The request of an infinite query is the one of its initial page.
-queryUtils.posts.feed.infiniteQueryKey({
-	query: { cursor: undefined, status: "open", limit: 50 },
-}); // ["posts", "feed", "~infinite", { query: { ... } }]
-queryUtils.notifications.streamedQueryKey(); // ["notifications", "~streamed"]
-```
-
-Without a request, they return the key that matches every query of their kind
-for the route.
-
-```ts
-const postKey = queryUtils.posts.get.queryKey({ params: { id: "post_1" } });
-
-const post = queryClient.getQueryData(postKey);
-
-queryClient.setQueryData(postKey, (current) =>
-	current && current.status === 200
-		? {
-				...current,
-				body: {
-					...current.body,
-					title: "Edited",
-				},
-			}
-		: current,
-);
-```
-
-## Custom Query Keys
-
-Pass `queryKey` in options when a query needs a custom key, such as two streamed
-queries of a route that accumulate data with different reducers.
-
-```tsx
-const post = useQuery(
-	queryUtils.posts.get.queryOptions({
-		request: { params: { id: "post_1" } },
-		queryKey: ["posts", "detail", "post_1"],
-	}),
-);
-```
-
-Use the same custom key with TanStack Query cache APIs.
-
-```ts
-await queryClient.invalidateQueries({
-	queryKey: ["posts", "detail", "post_1"],
-});
-```
-
-## Direct Fetch Calls
-
-Use `fetch()` when you need direct access to the underlying [Fetch Client](/docs/client/fetch-client#call-routes) call.
+Each util also has `fetch()`, which calls the route like the client:
 
 ```ts
 const { body: post } = await queryUtils.posts.get.fetch({
 	params: { id: "post_1" },
 });
-```
-
-## Mutations
-
-```tsx
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-
-const queryClient = useQueryClient();
-
-const createPost = useMutation(
-	queryUtils.posts.create.mutationOptions({
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({
-				queryKey: queryUtils.posts.list.key(),
-			});
-		},
-	}),
-);
-```
-
-```tsx
-createPost.mutate({
-	body: { title: "Hello", body: "First post" },
-});
-```
-
-Mutation options use the prefix and the route path as their default mutation key. Use
-`mutationKey()` with TanStack Query APIs that filter or configure mutations.
-
-```ts
-queryClient.setMutationDefaults(queryUtils.posts.create.mutationKey(), {
-	retry: 2,
-});
-```
-
-## Fetch Options
-
-Generated options accept normal TanStack Query options plus `fetchOptions`,
-which accepts the Fetch client's [per-call options](/docs/client/fetch-client#per-call-options).
-Query options do not accept `signal`, because the cancellation signal provided
-by TanStack Query is passed to the request automatically.
-
-```tsx
-const post = useQuery(
-	queryUtils.posts.get.queryOptions({
-		request: { params: { id: "post_1" } },
-		fetchOptions: {
-			cache: "no-store",
-			additionalHeaders: {
-				"x-trace-id": traceId,
-			},
-		},
-	}),
-);
-```
-
-## Typesafe Error Handling
-
-The `error` of a query or mutation holds the same errors that
-[`safe()`](/docs/client/fetch-client#with-safe) returns, narrowed the same way:
-
-```tsx
-import { isDefinedError } from "@rest-rpc/core";
-
-const createPost = useMutation(
-	queryUtils.posts.create.mutationOptions({
-		onError(error) {
-			if (isDefinedError(error) && error.code === "SLUG_TAKEN") {
-				console.log(error.message);
-			}
-		},
-	}),
-);
 ```

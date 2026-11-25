@@ -1,14 +1,12 @@
 ---
 title: Route Builder
-description: Define HTTP routes with request segments, typed responses, errors, and streams.
+description: Define a route's method, path, request, responses and handler.
 ---
 
-A route declares its method and path, the request it reads, the responses it
-returns and the errors it throws. Schemas are any
-[Standard Schema](/docs/http-behavior/validation), or `type<T>()` for types
-alone.
+A route is a chain of builder calls that ends with `.handler()`. Schemas are
+any Standard Schema, such as Zod, Valibot or ArkType.
 
-## Start with Defaults
+## Defaults
 
 ```ts
 import { route } from "@rest-rpc/server";
@@ -16,29 +14,20 @@ import * as z from "zod";
 
 const create = route
 	.body(z.object({ title: z.string(), body: z.string() }))
-	.handler(({ body: { title, body } }) => ({
-		id: crypto.randomUUID(),
-		title,
-		body,
-	}));
+	.handler(({ body }) => createPost(body));
 
 export const router = { posts: { create } }; // POST /posts/create
 ```
 
-Without a method, a route is `POST`, and without a path, its path is its keys
-in the route tree. A returned value is a JSON body with status `200`. Route
-trees are plain objects, so group them into modules and compose them where
-they're served or given to a client.
+- No method means `POST`.
+- No path means the route's keys in the route tree, such as `/posts/create`.
+- A returned value is a JSON body with status `200`.
+- Route trees are plain objects, so split them into modules and combine them
+  however you like.
 
-## Choose a Method and Path
+## Method and Path
 
-```ts twoslash
-import { route } from "@rest-rpc/server";
-import * as z from "zod";
-declare function searchPosts(term: string): string[];
-declare function findPost(id: string): { id: string };
-declare function listPosts(): { id: string }[];
-// ---cut---
+```ts
 const search = route
 	.get("/posts/search")
 	.query(z.object({ term: z.string() }))
@@ -48,73 +37,36 @@ const get = route
 	.get("/posts/:id")
 	.handler(({ params }) => findPost(params.id));
 
-const list = route.get().handler(() => listPosts()); // GET, path from its tree keys
+const list = route.get().handler(() => listPosts()); // GET, path from its keys
 ```
 
-The methods are `.get()`, `.post()`, `.put()`, `.patch()` and `.delete()`,
-once per route. `:name` segments are string params unless `.params()` defines
-them. Wildcards and regular expressions aren't supported.
+- The methods are `.get()`, `.post()`, `.put()`, `.patch()` and `.delete()`.
+- `:name` segments are string params unless `.params()` defines them.
+- Wildcards and regular expressions aren't supported.
 
-## Path Prefixes
-
-`.prefix()`, called before the method, prepends a path to every route built
-from it. Prefixes are part of the route, so clients and OpenAPI use the full
-path:
-
-```ts
-const tenant = route
-	.prefix("/tenants/:tenant")
-	.params(z.object({ tenant: z.string() }));
-
-const get = tenant
-	.get("/posts/:id") // GET /tenants/:tenant/posts/:id
-	.params(z.object({ id: z.coerce.number() }))
-	.handler(({ params }) => findPost(params.tenant, params.id));
-```
-
-Params are all inferred or all defined: once a route has a `.params()`
-schema, its schemas have to cover every segment, the prefix's included.
-
-## Request Segments
+## Request
 
 ```ts
 const update = route
 	.patch("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ notify: z.enum(["true", "false"]).optional() }))
+	.query(z.object({ notify: z.stringbool().optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
 	.body(z.object({ title: z.string() }))
 	.handler(({ params, query, headers, body }) =>
-		updatePost(params.id, body.title, {
-			notify: query.notify === "true",
-			requestId: headers["x-request-id"],
-		}),
+		updatePost(params.id, body.title, query.notify),
 	);
 ```
 
-- `.params()` keys can't be optional, and a route with params needs `:name`
-  segments for them.
+- Params, query and headers arrive as strings, so their schemas coerce. See
+  [Content Types](/docs/http-behavior/encoding#params-query-and-headers).
+- `.params()` keys can't be optional, and need matching `:name` segments.
 - `GET` routes have no `.body()`.
-- Header names are lowercase, and an uppercase name is a type error.
-- Each segment can be called more than once. Every schema validates the
-  original value, and their outputs are shallow-merged, so each has to output
-  an object, and a strict schema such as `z.strictObject()` would reject the
-  other schemas' keys:
+- Header names are lowercase. An uppercase name is a type error.
 
-```ts
-const base = route.body(z.object({ title: z.string() }));
-const create = base
-	.body(z.object({ description: z.string().optional() }))
-	.handler(({ body }) => createPost(body.title, body.description));
-```
+## Responses
 
-See [Encoding and Content Types](/docs/http-behavior/encoding) for what each
-segment receives, and for bodies other than JSON.
-
-## Return Responses
-
-A handler returns the response body, or `respond()` for the rest of the
-response:
+Return the body, or `respond()` to also set the status, headers or cookies:
 
 ```ts
 const create = route
@@ -125,27 +77,35 @@ const create = route
 		return respond(post, {
 			status: 201, // 200 to 299
 			headers: { location: `/posts/${post.id}` },
-			cookies: ["seen=1; HttpOnly"], // each its own Set-Cookie header
+			cookies: ["seen=1; HttpOnly"],
 		});
 	});
 ```
 
-- `undefined` is a response without a body.
-- An async iterable is a [stream](/docs/server-sent-events).
-- A Fetch `Response` is sent as it is: see [Raw Responses](#raw-responses).
-- Anything else is a JSON body, a `status` field included, since only
-  `respond()` results are read as responses.
+What a handler returns decides the response:
 
-Without `.response()`, the statuses and bodies the handler returns are the
-client's result type. Values the handler returns keep their literal types, such
-as `"draft"`. A value built in a variable or a function before it's returned
-has the type TypeScript gave it there, where strings in objects widen to
-`string`, so annotate it or use `as const` where the client should see the
-literals. Errors are [thrown](#define-errors), not returned.
+- `undefined`: no body.
+- An async iterable: a [stream](/docs/server-sent-events).
+- A Fetch `Response`: sent as it is. See [Raw Responses](#raw-responses).
+- Anything else: a JSON body. An object with a `status` field is still just a
+  body; only `respond()` sets the status.
 
-## Define Responses
+Errors are thrown, not returned. See [Errors](/docs/errors).
 
-`.response(schema, options)` defines a response and validates it at runtime:
+### Inferred Responses
+
+Without `.response()`, the client's result type is whatever the handler
+returns. Nothing is validated at runtime.
+
+:::note
+A value built in a variable before it's returned loses literal types such as
+`"draft"`. Use `as const` or an annotation to keep them.
+:::
+
+### Defined Responses
+
+`.response(schema, options)` defines a response. It types the handler and the
+client, and is validated before it's sent:
 
 ```ts
 route
@@ -166,21 +126,18 @@ route
 	});
 ```
 
-- `status` defaults to `200`, and each status is defined once.
-- A response without a body takes only options, such as `.response()` or
-  `.response({ status: 204 })`. A schema always defines a body, so a schema for
-  `undefined` defines a JSON body that can't be encoded.
-- A plain return value is the body of the only defined response. With several,
-  `respond()` takes one of the defined statuses.
-- `headers` works on every response, bodyless and stream ones included. Its
-  schema decides which headers are sent, as
-  [Validation](/docs/http-behavior/validation#responses) describes.
+- `status` defaults to `200`.
+- A response without a body takes only options: `.response()` or
+  `.response({ status: 204 })`.
+- With one defined response, the handler can return the body directly. With
+  several, it uses `respond()` with one of their statuses.
+- A `headers` schema decides which headers are sent: `z.object()` sends only
+  the ones it declares.
 
 ## Raw Responses
 
-Return a Fetch `Response` for anything the builder can't describe, such as a
-redirect or a legacy format. The request is still validated and middleware
-still runs, but the response is sent as it is, without validation or codecs:
+Return a Fetch `Response` for what the builder can't describe, such as a
+redirect:
 
 ```ts
 route
@@ -190,20 +147,17 @@ route
 	);
 ```
 
-- The client gets `status: number` and `body: unknown`, decoded by the
-  received content type. A handler that returns a `Response` on some paths
-  makes the whole route loosely typed. Defined errors stay typed.
-- Middleware sees the `Response` as the `body` of the response `next()`
-  resolves to. Its `status`, `headers` and `cookies` are what's sent, so
-  middleware that adds a header works on raw routes too.
-- To declare a raw route in a [contract](/docs/contract-first), use
-  `.response(raw({ description }))` as its only response. OpenAPI documents it
-  as `default`.
+- The request is still validated and middleware still runs.
+- The response is sent as it is, without validation.
+- Returning a `Response` on any path makes the route's result untyped:
+  `status: number` and `body: unknown`. Defined errors stay typed.
+- In a [contract](/docs/contract-first), declare it with
+  `.response(raw({ description }))`.
 
 ## Static Responses
 
-`.static(value)` completes a route with a response that is the same for every
-request. It's validated and serialized once, when the routes are compiled:
+`.static(value)` completes a route whose response never changes. It's
+validated and serialized once, at startup:
 
 ```ts
 route.get("/health").static({ ok: true });
@@ -214,213 +168,81 @@ route
 	);
 ```
 
-- It skips [interceptors](/docs/server/interceptors) and middleware, so it's for
-  public content. Put headers such as CORS in the response itself, and use
-  `.handler()` for anything that needs access control.
+:::warning
+Static routes skip middleware and interceptors, so use them only for public
+content. Put headers such as CORS in the response itself.
+:::
+
 - It can't be a function, promise or stream, and the route can't read the
-  request or have middleware.
-- Its schemas and codecs have to be synchronous, since compiling is.
+  request.
+- Its schemas and codecs have to be synchronous.
 
-## Define Errors
+## Stacking Calls
 
-Errors are thrown. `.error(code, options)` defines one, and handlers and
-middleware receive it in `errors`:
-
-```ts
-const get = route
-	.get("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.response(postSchema)
-	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
-	.handler(({ params, errors }) => {
-		const post = findPost(params.id);
-		if (!post) throw errors.POST_NOT_FOUND({ data: { id: params.id } });
-		return post;
-	});
-```
-
-| Option        | Default  | Description                                     |
-| ------------- | -------- | ----------------------------------------------- |
-| `status`      | `400`    | 400 to 599                                      |
-| `data`        | none     | Schema of the error's `data`                    |
-| `headers`     | none     | Schema of its response headers                  |
-| `message`     | the code | Default message, replaced when thrown           |
-| `description` | none     | Describes the error in [OpenAPI](/docs/openapi) |
-
-To throw an error outside handlers, define it once with `routeError()`, add it
-to routes, and throw it with `new` anywhere:
+Every call returns a new builder, so a partial route is a base that routes
+build on without affecting each other:
 
 ```ts
-import { route, routeError } from "@rest-rpc/server";
-
-export const PostNotFound = routeError("POST_NOT_FOUND", {
-	status: 404,
-	data: z.object({ id: z.string() }),
-});
-
-export const findPost = (id: string) => {
-	const post = posts.get(id);
-	if (!post) throw new PostNotFound({ data: { id } });
-	return post;
-};
-
-const get = route
-	.get("/posts/:id")
-	.error(PostNotFound)
-	.handler(({ params }) => findPost(params.id));
-```
-
-Adding the same definition twice, such as on a base and a route, is fine, and
-a different error with the same code throws. Defining errors doesn't define
-responses. See [Errors](/docs/http-behavior/errors) for what's sent, and for
-errors a route doesn't define.
-
-## Describe Routes for OpenAPI
-
-`.openAPI()` sets the route's [operation details](/docs/openapi#operation-details),
-such as its summary and tags. Responses and errors take a `description` in
-their own options:
-
-```ts
-const remove = route
-	.delete("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.openAPI({ summary: "Delete a post", tags: ["Posts"] })
-	.response({ status: 204, description: "Post deleted." })
-	.error("POST_NOT_FOUND", { status: 404, description: "No post has this id." })
-	.handler(({ params }) => deletePost(params.id));
-```
-
-- `.response(schema, { description })` and `.response({ description })`
-  describe a response.
-- `.error(code, { description })` and `routeError(code, { description })`
-  describe an error.
-- `raw({ description })` describes a [raw response](#raw-responses).
-- Request and response schemas describe themselves through the
-  [schema converter](/docs/openapi#schema-conversion).
-
-See [OpenAPI](/docs/openapi) for how they're documented.
-
-## Reuse Builders
-
-Every builder method returns a new route, so a partial route is a base that
-other routes share without affecting each other:
-
-```ts
-const authenticated = route
+const tenant = route
+	.prefix("/tenants/:tenant")
+	.params(z.object({ tenant: z.string() }))
 	.headers(z.object({ authorization: z.string() }))
 	.error("UNAUTHORIZED", { status: 401 });
 
-const list = authenticated.get("/posts").handler(() => listPosts());
-const remove = authenticated
-	.delete("/posts/:id")
-	.handler(({ params }) => deletePost(params.id));
+const list = tenant.get("/posts").handler(() => listPosts()); // GET /tenants/:tenant/posts
+
+const get = tenant
+	.get("/posts/:id") // GET /tenants/:tenant/posts/:id
+	.params(z.object({ id: z.coerce.number() })) // params: { tenant, id }
+	.handler(({ params }) => findPost(params.tenant, params.id));
 ```
+
+- `.prefix()` comes before the method, and several prefixes join in order.
+  Clients and OpenAPI see the full path.
+- `.params()`, `.query()`, `.headers()` and `.body()` can repeat. Their outputs
+  merge, so each has to output an object, and a strict schema such as
+  `z.strictObject()` rejects the other schema's keys.
+- Once a route has a `.params()` schema, its schemas have to cover every
+  `:name` segment, the prefix's included.
+- `.use()` middleware runs in the order it's added.
+- `.meta()` values merge, and a later value for the same key wins.
+- A method is chosen once per route, and each `.response()` status and
+  `.error()` code is defined once. Adding the same error definition again,
+  such as on a base and a route, is fine.
 
 ## Handler Arguments
 
-- `params`, `query`, `headers` and `body`: the validated request.
-- `context`: initial values from the host and values middleware adds. See
-  [Context](/docs/middleware#context).
-- `route`: the route's definition, with its method, path and `meta`.
-- `errors`: the [defined errors](#define-errors).
-- `respond`: see [Return Responses](#return-responses).
-- `signal`: aborts when the client disconnects.
-
-Native request objects aren't passed. To use them,
-[put them in the context](/docs/middleware#values-from-the-host).
-
-## Route Definitions
-
-Every route keeps its definition under `~restrpc`, the same one handlers,
-middleware and interceptors receive as `route`. The key keeps it apart from the
-builder's methods. Read it in your own code, such as for a route's method,
-path or `meta`:
-
 ```ts
-const { method, path, meta } = get["~restrpc"]; // "GET", "/posts/:id", { ... }
+type HandlerArgs = {
+	/** The validated request. */
+	params: Params;
+	query: Query;
+	headers: Headers;
+	body: Body;
+	/** Values from the host and from middleware. See Middleware. */
+	context: Context;
+	/** The route's definition: `method`, `path` and `meta`. */
+	route: RouteDefinition;
+	/** The route's defined errors, to throw. */
+	errors: Errors;
+	/** Builds a response with a status, headers or cookies. */
+	respond: Respond;
+	/** Aborts when the client disconnects. */
+	signal: AbortSignal;
+};
 ```
 
-- `path` is `undefined` for a route that takes its path from its key in the
-  route tree, until the tree is served or a client is created. `route` in
-  handlers, middleware and interceptors has it resolved.
-- It's read-only. Build routes with the builder.
+The native request isn't passed. To use it,
+[put it in the context](/docs/middleware#context).
+
+A route's definition is also readable outside handlers, from
+`get["~restrpc"]`. Its `path` is `undefined` until the route tree is served or
+given to a client, when routes without a path get theirs from their keys.
 
 ## Type Helpers
 
-The type helpers give a route's types to code outside it, such as services or
-handlers written separately. Infer from a route before `.handler()`, or from a
-contract route: a completed route's type depends on its handler. Each helper
-also takes a route tree:
-
-```ts
-import type { InferServerRequest } from "@rest-rpc/server";
-import type { router } from "./router.ts";
-
-type CreatePostRequest = InferServerRequest<typeof router>["posts"]["create"];
-```
-
-### Infer Server Request
-
-The object a handler receives, with every [argument](#handler-arguments):
-
-```ts twoslash
-import type { InferServerRequest } from "@rest-rpc/server";
-import { route } from "@rest-rpc/server";
-import * as z from "zod";
-
-const updateDefinition = route
-	.patch("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.body(z.object({ title: z.string() }));
-
-type UpdatePostRequest = InferServerRequest<typeof updateDefinition>;
-
-const updatePost = ({ params, body }: UpdatePostRequest) => ({
-	id: params.id,
-	title: body.title,
-});
-
-const update = updateDefinition.handler(updatePost);
-```
-
-### Infer Server Response
-
-What a handler can return for the responses `.response()` defines. Inferred
-responses have nothing to infer before `.handler()`:
-
-```ts twoslash
-import type { InferServerResponse } from "@rest-rpc/server";
-import { respond, route } from "@rest-rpc/server";
-import * as z from "zod";
-
-const postSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-	body: z.string(),
-});
-
-const createDefinition = route
-	.post("/posts")
-	.body(z.object({ title: z.string(), body: z.string() }))
-	.response(postSchema, { status: 201 })
-	.response({ status: 202 });
-
-type CreatePostResponse = InferServerResponse<typeof createDefinition>;
-
-const createPost = (title: string, body: string): CreatePostResponse =>
-	body.includes("http")
-		? respond(undefined, { status: 202 })
-		: respond({ id: "post_1", title, body }, { status: 201 });
-
-const create = createDefinition.handler(({ body }) =>
-	createPost(body.title, body.body),
-);
-```
-
-### Infer Server Handler
-
-The full handler signature, to write a handler apart from its definition:
+Write a handler or service apart from its route by inferring types from the
+route before `.handler()`:
 
 ```ts twoslash
 import { route, type InferServerHandler } from "@rest-rpc/server";
@@ -448,3 +270,15 @@ const getPost: InferServerHandler<typeof getDefinition> = ({
 
 const get = getDefinition.handler(getPost);
 ```
+
+```ts
+/** The object a handler receives, with every handler argument. */
+type InferServerRequest<Route>;
+/** What a handler can return for the responses `.response()` defines. */
+type InferServerResponse<Route>;
+/** The full handler signature. */
+type InferServerHandler<Route>;
+```
+
+Each also takes a route tree and returns a tree of types:
+`InferServerRequest<typeof router>["posts"]["create"]`.

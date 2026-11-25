@@ -15,7 +15,7 @@ type OpenApiPathItem = Partial<
 /**
  * The OpenAPI document shape returned by `createOpenApiDocument()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/openapi}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/openapi}
  */
 export type OpenApiDocument = {
 	/** OpenAPI specification version for the generated document. */
@@ -63,7 +63,7 @@ export type OpenApiDocument = {
  * an empty OpenAPI Schema Object. `transformOperation` can adjust each
  * generated operation for project-specific conventions.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/openapi#document-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/openapi#document-options}
  */
 export type CreateOpenApiDocumentOptions = Partial<
 	Omit<OpenApiDocument, "info" | "paths">
@@ -79,7 +79,7 @@ export type CreateOpenApiDocumentOptions = Partial<
 /**
  * Generates an OpenAPI document object from HTTP routes in a contract.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/openapi}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/openapi}
  */
 export function createOpenApiDocument(
 	contract: Contract,

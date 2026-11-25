@@ -26,7 +26,7 @@ export type ResponseDefinition = {
 /**
  * HTTP metadata associated with a defined response.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#defined-responses}
  */
 export type ResponseOptions = {
 	/** HTTP status of the response, from 200 to 299. Defaults to 200. */

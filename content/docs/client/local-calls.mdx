@@ -1,39 +1,9 @@
 ---
 title: Local Calls
-description: Call one route in-process with call(), without HTTP.
+description: Run a route in the same process with call(), without HTTP.
 ---
 
-To call routes in the same process with the same behavior as over HTTP, such
-as in tests of the app, pass the app's `fetch` to the
-[Fetch client](/docs/client/fetch-client#custom-fetch). Requests are encoded,
-intercepted and decoded as in production:
-
-```ts
-import { createApp, createClient } from "@rest-rpc/server";
-
-const app = createApp(router);
-const client = createClient(router, {
-	origin: "http://localhost",
-	fetch: app.fetch,
-});
-```
-
-`call()` runs one route without HTTP, for when skipping it is the point: a test
-of one route with its context passed directly, or a route that runs another
-route's validation and middleware. It runs the same route pipeline as an HTTP
-request:
-
-1. The input is validated with the route's request schemas.
-2. The route's middleware and handler run.
-3. The handler output is validated with the route's response schemas.
-
-The steps that only exist for HTTP are skipped: body decoding, request content
-type checks, and response serialization. The result is the
-validated output, not an encoded `Response`. A
-[raw response](/docs/route-builder#raw-responses) a handler returns is the
-exception: it is read as the fetch client reads it, with the default codecs.
-
-## Call a Route
+`call()` runs one route without HTTP, such as in a test of a single route:
 
 ```ts twoslash
 import { call, route } from "@rest-rpc/server";
@@ -51,35 +21,23 @@ const get = route
 const response = await call(get, { params: { id: 1 } });
 ```
 
-`call()` takes the same request and returns the same response as a Fetch
-client call. Request segments are schema inputs, the values a client would
-send, and handlers receive the schema output. A request body's content type is
-a `content-type` header in the request, as in a client call.
-
-The optional third argument replaces what an HTTP request would otherwise provide:
+- It takes the same request and returns the same result as a client call.
+- The request and response are validated, and middleware runs, as over HTTP.
+- Nothing is encoded or decoded, so the result is the handler's validated
+  output, not what JSON would make of it.
+- It rejects like a client call, so [`safe()`](/docs/errors#with-safe) works
+  with it.
 
 ```ts
 type CallOptions = {
-	/** Passed to the handler. Defaults to a signal that never aborts. */
-	signal?: AbortSignal;
 	/** The initial context the route declares. Required when it declares any. */
 	context?: object;
+	/** Passed to the handler. Never aborts by default. */
+	signal?: AbortSignal;
 };
 ```
 
-See [Values from the Host](/docs/middleware#values-from-the-host) for initial
-context.
-
-### Errors
-
-A local call rejects like a Fetch client call, so
-[`safe()`](/docs/client/fetch-client#with-safe) works with it too:
-
-- An error of a class the route defines rejects as defined, with the
-  validated `data` it was created with.
-- A defined error whose `data` fails validation rejects with the
-  `INTERNAL_SERVER_ERROR` that creating it throws.
-- Any other `RouteError`, including
-  [built-in errors](/docs/http-behavior/errors#built-in-errors) and one with a
-  code the route defines but not its class, rejects as thrown.
-- Other errors thrown by the handler reject unchanged.
+:::tip
+To test the whole app, including encoding and interceptors, pass the app's
+`fetch` to a [client](/docs/client/fetch-client#custom-fetch) instead.
+:::

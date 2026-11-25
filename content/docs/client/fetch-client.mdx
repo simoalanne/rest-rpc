@@ -1,416 +1,136 @@
 ---
 title: Fetch Client
-description: Create a typed Fetch client to call your routes over HTTP.
+description: Call your routes over HTTP with a typed client.
 ---
-
-`createClient()` creates a typed Fetch client from a runtime contract. When the
-routes are implemented in the server, [extract a contract](/docs/client/contract-extraction) first.
 
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
 import { getContract } from "./contract.ts" with { type: "macro" };
 
-const client = createClient(getContract(), {
+export const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 });
 ```
 
-The client has the same route tree shape as the contract. In a browser app
-served from the same origin as the routes, no options are needed:
-
-```ts
-const client = createClient(getContract()); // routes at the origin's root
-const client = createClient(getContract(), { mountPath: "/api" }); // routes under /api
-```
+The client has the same shape as the route tree. In a browser app on the same
+origin as the API, no options are needed.
 
 ## Call Routes
-
-The route definition determines the request and result shapes.
 
 ```ts
 const created = await client.posts.create({
 	body: { title: "Hello", body: "First post" },
 });
 const response = await client.posts.get({ params: { id: created.body.id } });
-```
 
-A call returns a union with one member per status:
-
-```ts
-type Result<TStatus, TBody, THeaders> = {
-	/** Checking it narrows the result to that response. */
-	status: TStatus;
-	/** `undefined` for a response without a body. */
-	body: TBody;
-	/** Received headers with lowercase names, defined headers typed. */
-	headers: Record<string, string> & THeaders;
-	/** `Set-Cookie` values. Browsers hide them from `fetch`, so it's empty there. */
-	cookies: readonly string[];
-};
-```
-
-```ts
 if (response.status === 200) {
 	console.log(response.body.title);
 }
 ```
 
-A call resolves with a successful response and rejects with an error otherwise.
-See [Handle Errors](#typesafe-error-handling).
-
-## Typesafe Error Handling
-
-An error response whose JSON body has a `code` rejects with a `RouteError`:
+A call resolves with one of the route's successful responses:
 
 ```ts
-class RouteError extends Error {
-	code: string; // the body's `code`
+type Result = {
+	/** Checking it narrows `body` and `headers` to that response. */
 	status: number;
-	message: string; // the body's `message`, or the code
-	data: unknown; // the body's `data`, typed for defined errors
+	/** `undefined` for a response without a body. */
+	body: Body;
+	/** Lowercase names. Defined headers are typed. */
 	headers: Record<string, string>;
-	cookies: readonly string[]; // `Set-Cookie` values, empty in browsers
-	isDefined: boolean; // the route defines the code with this status
-}
-```
-
-An error whose code the route [defines](/docs/route-builder#define-errors) is
-part of the route's types: its `data` and defined headers are typed, and
-validated with [response validation](#response-validation).
-Errors the route does not define, such as an `UNAUTHORIZED` sent by auth
-middleware or a [built-in error](/docs/http-behavior/errors#built-in-errors),
-keep their values but are typed only as `Error`.
-
-Everything else rejects with a plain `Error`:
-
-- Other error responses, such as a proxy's error page. The `message` includes
-  the status, and the `cause` holds the received response, as
-  `{ status, headers, cookies, body }` with the decoded body.
-- Responses that break the route contract: a defined error code with another
-  status, a 2xx status the route's defined responses do not include, a stream
-  where a body is defined or a body where a stream is, a body that cannot be
-  decoded, or, with response validation, a body or headers that fail it, a
-  declared `content-type` included. The `cause` holds the validation issues or the
-  decoding error.
-- No response, such as on network failures, timeouts and aborted requests. The
-  call rejects with the original error.
-
-:::warning
-Routes with [inferred responses](/docs/route-builder#return-responses) define
-no statuses at runtime, so every 2xx response resolves. An
-[extracted contract](/docs/client/contract-extraction) has no schemas, so its
-bodies, headers and error `data` are not validated.
-:::
-
-Use [`safe()`](#with-safe) to handle the errors a route defines as expected
-domain errors, and `try`/`catch` for general error handling.
-
-### With try/catch
-
-`try`/`catch` suits general error handling, such as logging, redirecting on
-`UNAUTHORIZED` or showing a generic failure. `instanceof RouteError` matches
-errors whether or not the route defines them, but does not type them with the route's codes
-or `data`:
-
-```ts twoslash
-// ---cut-start---
-// @filename: router.ts
-import { route } from "@rest-rpc/server";
-import * as z from "zod";
-
-const get = route
-	.get("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
-	.handler(({ params }) => ({
-		id: params.id,
-		title: "Hello",
-		body: "First post",
-	}));
-
-export const router = { posts: { get } };
-
-// @filename: client.ts
-import { createClient } from "@rest-rpc/core";
-import type { router } from "./router";
-declare function getContract(): typeof router;
-const client = createClient(getContract(), { origin: "http://localhost:3000" });
-// ---cut-end---
-import { RouteError } from "@rest-rpc/core";
-
-try {
-	const { body } = await client.posts.get({ params: { id: "post_1" } });
-} catch (error) {
-	if (error instanceof RouteError) {
-		console.log(error.status, error.code);
-	}
-	throw error;
-}
-```
-
-A caught error is `unknown`, so `isDefinedError(error)` narrows it only to
-`RouteError`. Pass the client route or tree the error can come from as the
-second argument to narrow it to their defined errors. A route or route tree
-works too, for code that has no client to pass, such as where clients are
-created per request. The argument is only read for its type:
-
-```ts
-try {
-	await client.posts.create({ body });
-} catch (error) {
-	if (
-		isDefinedError(error, client.posts.create) &&
-		error.code === "SLUG_TAKEN"
-	) {
-		console.log(error.message);
-	}
-	throw error;
-}
-
-// One handler for every route, such as for errors defined on a shared builder
-const handleError = (error: unknown) => {
-	if (isDefinedError(error, contract) && error.code === "UNAUTHORIZED") {
-		redirectToSignIn();
-	}
+	/** `Set-Cookie` values. Always empty in browsers. */
+	cookies: readonly string[];
 };
 ```
 
-### With `safe()`
+Anything else rejects. See [Errors](/docs/errors#handle-errors-on-the-client)
+for handling them typed, and [Server-Sent Events](/docs/server-sent-events#read-events)
+for streams.
 
-`safe()` suits expected domain errors. It resolves a call to an `{ error }` or
-`{ data }` result instead of rejecting, with the error typed for the route, and
-`data` is typed only after checking `error`. `isDefinedError()` narrows the
-error to the route's defined errors, and checking `code` types their `data`:
+## Per-Call Options
 
-```ts twoslash
-// ---cut-start---
-// @filename: router.ts
-import { route } from "@rest-rpc/server";
-import * as z from "zod";
+The second argument takes [Fetch options](https://developer.mozilla.org/en-US/docs/Web/API/RequestInit)
+and headers the route doesn't define:
 
-const get = route
-	.get("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
-	.handler(({ params }) => ({
-		id: params.id,
-		title: "Hello",
-		body: "First post",
-	}));
-
-export const router = { posts: { get } };
-
-// @filename: client.ts
-import { createClient } from "@rest-rpc/core";
-import type { router } from "./router";
-declare function getContract(): typeof router;
-const client = createClient(getContract(), { origin: "http://localhost:3000" });
-// ---cut-end---
-import { isDefinedError, safe } from "@rest-rpc/core";
-
-const { error, data } = await safe(
-	client.posts.get({ params: { id: "post_1" } }),
+```ts
+const response = await client.posts.get(
+	{ params: { id: "post_1" } },
+	{
+		cache: "no-store",
+		signal: controller.signal,
+		additionalHeaders: { "x-trace-id": traceId },
+	},
 );
 
-if (isDefinedError(error)) {
-	console.log(error);
-} else if (error) {
-	throw error;
-} else {
-	console.log(data.body);
-}
+await client.health(undefined, { cache: "no-store" }); // a route without input
 ```
 
-Calls return a `ClientPromise`, a promise that also carries the type of its
-errors. Promise methods and `async` functions return plain promises, which
-`safe()` types with an `unknown` error. To keep the error type in a wrapper,
-return the call directly and annotate it with `ClientPromise`.
-
-## Consume Streams
-
-A [streaming route](/docs/server-sent-events) returns an async iterable of `SseEvent<T>`
-values as its `body`. Application data is available on `event.data`:
-
-```ts
-type SseEvent<T> = {
-	/** The event's data, decoded with the `sse.format`, JSON by default. */
-	data: T;
-	/**
-	 * The last event ID: the event's `id` field, or the previous event's when
-	 * it has none, as in `EventSource`.
-	 */
-	id?: string;
-	/** The event name from the `event` field. */
-	event?: string;
-	/** The reconnection time in milliseconds from the `retry` field. */
-	retry?: number;
-};
-```
-
-Narrow the response before iterating its body:
-
-```ts
-const response = await client.notifications();
-
-if (response.status === 200) {
-	for await (const event of response.body) {
-		console.log(event.data.message);
-		console.log(event.id, event.event, event.retry);
-	}
-}
-```
-
-Every `text/event-stream` response is parsed as an SSE stream, following the
-[SSE spec](https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream).
-Body codecs are not consulted for it.
-
-The initial request and later stream iteration can fail independently. Pass an
-`AbortSignal` in the per-call options to cancel both the request and stream:
-
-```ts
-const controller = new AbortController();
-const response = await client.notifications(undefined, {
-	signal: controller.signal,
-});
-
-controller.abort();
-```
-
-### Reconnecting
-
-The client reads SSE events over Fetch but is not a replacement for the
-browser `EventSource` API. The `id`, `event`, and `retry` fields are exposed as
-metadata only: the client does not reconnect automatically, send the last event
-ID, or filter events by name.
-
-To resume a stream, send the last received event ID in the `last-event-id`
-header. See [Resume a Stream](/docs/server-sent-events#resume-a-stream) for reading it
-on the server.
-
-```ts
-const controller = new AbortController();
-let lastEventId: string | undefined;
-let retryMs = 3_000;
-
-while (!controller.signal.aborted) {
-	try {
-		const response = await client.notifications(undefined, {
-			signal: controller.signal,
-			additionalHeaders: { "last-event-id": lastEventId },
-		});
-		for await (const event of response.body) {
-			lastEventId = event.id;
-			retryMs = event.retry ?? retryMs;
-			handleNotification(event.data);
-		}
-	} catch (error) {
-		if (controller.signal.aborted) break;
-		if (error instanceof RouteError && error.status < 500) throw error;
-	}
-	await new Promise((resolve) => setTimeout(resolve, retryMs));
-}
-```
-
-The loop reconnects when the stream ends or fails, after the server's `retry`
-time, and stops on an abort or a client error such as `401`.
+When a header is set in several places, the route's headers win over
+`additionalHeaders`, which win over `globalHeaders`.
 
 ## Client Options
-
-```ts
-const client = createClient(getContract(), {
-	origin: "https://api.example.com",
-	fetchOptions: {
-		credentials: "include",
-	},
-});
-```
 
 ```ts
 type CreateClientOptions = {
 	/**
 	 * The server's origin, such as `https://api.example.com`, without a path.
-	 * A trailing slash is ignored, and a path throws when the client is
-	 * created. Browsers default to the page's origin. Required outside browsers.
+	 * Defaults to the page's origin in browsers. Required elsewhere.
 	 */
 	origin?: string;
+	/** The path the routes are served under, the same as the server's. */
+	mountPath?: `/${string}`;
 	/**
-	 * The path the routes are served under, such as `/api`, the same as the
-	 * server's `mountPath`.
-	 */
-	mountPath?: AbsolutePath;
-	/**
-	 * Sends each request, the `Request` the last interceptor sends, with the
-	 * fetch options as the second argument when the call has any. Defaults to
-	 * the global `fetch`.
-	 */
-	fetch?: (request: Request, init?: RequestInit) => Promise<Response>;
-	/**
-	 * Functions around each HTTP exchange, the first outermost, such as for
-	 * logging, retries or refreshing credentials.
-	 */
-	interceptors?: readonly ClientInterceptor[];
-	/**
-	 * Fetch options merged into every request. Per-call options override them,
-	 * and `signal` and `additionalHeaders` can only be passed per call.
-	 */
-	fetchOptions?: Omit<FetchOptions, "signal" | "additionalHeaders">;
-	/** Codecs for other body formats, selected before the built-in ones. */
-	bodyCodecs?: readonly BodyCodec[];
-	/**
-	 * Headers added to every request, each a value, a promise of one, or a
-	 * function called for each request. Defined headers they set are optional
-	 * at call sites.
+	 * Headers added to every request: values, promises, or functions called
+	 * for each request. Route headers they always set become optional in calls.
 	 */
 	globalHeaders?: ClientHeaders;
-	sse?: {
-		/** The data format of events, the same as the server's. JSON by default. */
-		format?: SseFormat;
-	};
-	/**
-	 * Validates response bodies, defined response headers and stream event data
-	 * against the contract's schemas. `false` by default.
-	 */
+	/** Functions around each request. See Interceptors. */
+	interceptors?: readonly ClientInterceptor[];
+	/** Fetch options for every request. Per-call options override them. */
+	fetchOptions?: Omit<FetchOptions, "signal" | "additionalHeaders">;
+	/** Sends each request. Defaults to the global `fetch`. */
+	fetch?: (request: Request, init?: RequestInit) => Promise<Response>;
+	/** Codecs for other body formats, the same as the server's. */
+	bodyCodecs?: readonly BodyCodec[];
+	/** Event data format, the same as the server's. */
+	sse?: { format?: SseFormat };
+	/** Validates responses with the contract's schemas. `false` by default. */
 	validateResponses?: boolean;
 };
 ```
-
-See [Custom Fetch](#custom-fetch), [Interceptors](#interceptors),
-[Global Headers](#global-headers),
-[Encoding and Content Types](/docs/http-behavior/encoding) and
-[Server-Sent Events](/docs/server-sent-events) for more on each.
-
-## Global Headers
-
-`globalHeaders` adds headers to every request. Values can be static, promises,
-or provided by synchronous or asynchronous functions, which are called for every
-request. A provider is useful for values that can change during the lifetime of
-the client, such as an access token.
 
 ```ts
 const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 	globalHeaders: {
 		authorization: () => `Bearer ${readToken()}`,
-		"x-client-version": "2026-09",
 	},
+	fetchOptions: { credentials: "include" },
 });
 ```
 
-A global header with a guaranteed value makes a matching defined route header
-optional in client calls. A provider that can return `undefined` does not.
+### Custom Fetch
+
+Any function that takes a `Request` works. Pass an app's `fetch` to call it in
+the same process, such as in tests:
+
+```ts
+const client = createClient(router, {
+	origin: "http://localhost",
+	fetch: app.fetch,
+});
+```
 
 ## Interceptors
 
-An interceptor wraps each HTTP exchange, for logging, retries, or refreshing
-credentials. Create one with `clientInterceptor()`, which types the function
-and returns it unchanged:
+An interceptor wraps each request, for logging, retries or refreshing
+credentials:
 
 ```ts
 import { clientInterceptor, createClient } from "@rest-rpc/core";
 
 const refreshOn401 = clientInterceptor(async ({ request, next, route }) => {
-	// A request body can be read once, so it is cloned before a retry.
-	const response = await next(request.clone());
+	const response = await next(request.clone()); // a body can only be sent once
 	if (response.status !== 401 || route.meta?.access === "public") {
 		return response;
 	}
@@ -419,27 +139,6 @@ const refreshOn401 = clientInterceptor(async ({ request, next, route }) => {
 	return next(request);
 });
 
-const client = createClient(getContract(), {
-	origin: "https://api.example.com",
-	interceptors: [logging, refreshOn401],
-});
-```
-
-- `request` is a Fetch `Request` with the call's signal.
-- `next()` sends the request, and `next(request)` sends another one, through
-  the later interceptors to `fetch`. It may be called more than once.
-- `route` is the called route's definition, including its
-  [`meta`](/docs/middleware#metadata), so per-route behavior needs no URL
-  parsing.
-- Interceptors run in order, the first outermost, before the response is
-  decoded, so they receive error responses too.
-
-### Timeouts
-
-A timeout is an interceptor that sends the request with a signal that aborts
-after a time:
-
-```ts
 const timeout = (ms: number) =>
 	clientInterceptor(({ request, next }) =>
 		next(
@@ -450,222 +149,58 @@ const timeout = (ms: number) =>
 	);
 
 const client = createClient(getContract(), {
-	interceptors: [timeout(10_000)],
+	interceptors: [refreshOn401, timeout(10_000)],
 });
 ```
 
-The call rejects with a `TimeoutError`, and the caller's abort still applies.
-The signal also covers reading the body, so a stream ends when the time runs
-out. To time only the wait for the response, abort with your own timer and
-clear it once `next()` resolves.
-
-## Custom Fetch
-
-`fetch` sends each request. It receives a Fetch `Request`, the one the last
-[interceptor](#interceptors) sends, and defaults to the global `fetch`. For
-logic around each request, prefer interceptors.
-
-When the client's `fetchOptions` or the call set any [fetch options](#per-call-options),
-`fetch` also receives them as its second argument, the way the global `fetch`
-does. That's how options a `Request` doesn't keep, such as ones a runtime or
-framework adds to `fetch`, reach it.
-
-Any function that takes a `Request` works, so a Fetch app can serve the client
-in the same process, such as in tests:
-
-```ts
-import { router } from "./router.ts";
-import app from "./server.ts";
-
-const client = createClient(router, {
-	origin: "http://localhost",
-	fetch: app.fetch,
-});
-```
-
-A custom `fetch` also receives the raw `Response`, for details the client
-result does not keep, such as each `Set-Cookie` header from
-`headers.getSetCookie()`.
-
-## Per-Call Options
-
-Pass fetch options as the second argument. They override matching defaults in
-`fetchOptions`. Use `signal` for cancellation.
-
-```ts
-const response = await client.posts.get(
-	{
-		params: { id: "post_1" },
-		headers: { "x-request-id": "req_1" },
-	},
-	{
-		cache: "no-store",
-	},
-);
-```
-
-Use `additionalHeaders` for transport headers needed only by this call. Headers
-defined by the route remain part of the typed request object. When a header is
-set more than once, route headers take precedence over `additionalHeaders`,
-which take precedence over `globalHeaders`.
-
-```ts
-const response = await client.posts.get(
-	{ params: { id: "post_1" } },
-	{
-		additionalHeaders: {
-			"x-trace-id": traceId,
-		},
-	},
-);
-```
-
-A route without required input can be called without it. To pass per-call
-options to one, pass `undefined` as the input:
-
-```ts
-const response = await client.health(undefined, {
-	cache: "no-store",
-});
-```
+- Interceptors run in order, the first outermost.
+- `next()` sends the request, or another one you pass, and can be called more
+  than once.
+- `route` is the called route's definition, with its
+  [metadata](/docs/middleware#metadata).
+- They see error responses too, since they run before the response is read.
 
 ## Response Validation
 
-The client decodes response bodies without schema validation by default.
-Enable `validateResponses` to validate decoded bodies, defined response
-headers, and stream event data:
+With a [shared contract](/docs/contract-first), the client can validate
+response bodies, headers and stream events with the contract's schemas:
 
 ```ts
-const client = createClient(getContract(), {
-	origin: "https://api.example.com",
-	validateResponses: true,
-});
+const client = createClient(contract, { validateResponses: true });
 ```
 
-The client runs the schema again on what it decoded, and resolves with its
-output, or rejects with an [`Error`](#typesafe-error-handling). The server sent
-the schema's output, so a schema whose output its input rejects fails on the
-client:
+- A response that fails validation rejects with an `Error`.
+- It has no effect on an extracted contract, which has no schemas.
 
-```ts
-const get = route
-	.get("/posts/:id")
-	.response(z.string().transform((title) => ({ title })))
-	.handler(() => "Hello");
-// The server sends { "title": "Hello" }, which z.string() rejects on the client.
-```
-
-What the client decodes is also what the codec made of the body, such as a
-string for a `Date`. See
-[what the client receives](/docs/http-behavior/encoding#what-the-client-receives).
-
-:::note
-Validation requires runtime schemas, so it only applies to a
-[shared contract](/docs/contract-first). [Extracted contracts](/docs/client/contract-extraction)
-contain no schemas, and the option has no effect on them.
+:::warning
+The client validates what the server sent, which is the schema's output. A
+schema whose input doesn't accept its own output, such as
+`z.string().transform((title) => ({ title }))`, fails on the client.
 :::
 
 ## Type Helpers
 
-Use the type helpers when a client request or result type needs to be reused,
-for example in your own wrapper functions.
-
-```ts twoslash
-// ---cut-start---
-// @filename: router.ts
-import { route, sse } from "@rest-rpc/server";
-import * as z from "zod";
-
-const update = route
-	.patch("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.body(z.object({ title: z.string(), body: z.string() }))
-	.handler(({ params, body }) => ({
-		id: params.id,
-		title: body.title,
-		body: body.body,
-	}));
-
-const get = route
-	.get("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.error("POST_NOT_FOUND", { status: 404 })
-	.handler(({ params }) => ({
-		id: params.id,
-		title: "Hello",
-		body: "First post",
-	}));
-
-const notifications = route
-	.get("/notifications")
-	.response(sse(z.object({ postId: z.string(), message: z.string() })))
-	.handler(async function* () {
-		yield { postId: "post_1", message: "Ada liked your post" };
-	});
-
-export const router = { posts: { update, get }, notifications };
-
-// @filename: client.ts
-import { createClient } from "@rest-rpc/core";
-import type { router } from "./router";
-declare function getContract(): typeof router;
-const client = createClient(getContract(), { origin: "http://localhost:3000" });
-// ---cut-end---
-import type {
-	InferClientError,
-	InferClientRequest,
-	InferClientResponse,
-	InferClientStreamData,
-} from "@rest-rpc/core";
+```ts
+import type { InferClientRequest, InferClientResponse } from "@rest-rpc/core";
 
 type UpdatePostRequest = InferClientRequest<typeof client.posts.update>;
-
 type GetPostResponse = InferClientResponse<typeof client.posts.get>;
-
-type GetPostError = InferClientError<typeof client.posts.get>;
-
-type NotificationEvent = InferClientStreamData<typeof client.notifications>;
 ```
-
-| Type                                       | Infers                                                                                   |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `InferClientRequest<Route, GlobalHeaders>` | The request passed to the route call, or `undefined` for routes without input.           |
-| `InferClientResponse<Route>`               | Every response envelope of the route.                                                    |
-| `InferClientError<Route>`                  | The defined errors of the route.                                                         |
-| `InferClientStreamData<Route>`             | The `data` of each event from a [streaming route](#consume-streams), without `SseEvent`. |
-
-Calls reject with `InferClientError<Route>` for defined errors, and with other
-`Error`s otherwise.
-
-Headers that the client's `globalHeaders` always provides are optional in the
-inferred request.
-
-Code without a client can pass the type of a route instead. Pass the type of
-your `globalHeaders` as the second argument of `InferClientRequest` to make the
-headers it always provides optional:
 
 ```ts
-import type { InferClientRequest } from "@rest-rpc/core";
-import type { router } from "./router";
-
-const globalHeaders = { authorization: () => `Bearer ${getToken()}` };
-
-type UpdatePostRequest = InferClientRequest<
-	typeof router.posts.update,
-	typeof globalHeaders
->;
+/** What a call takes, or `undefined` for a route without input. */
+type InferClientRequest<Route, GlobalHeaders>;
+/** Every response a call resolves with. */
+type InferClientResponse<Route>;
+/** The route's defined errors. */
+type InferClientError<Route>;
+/** The `data` of each event of a stream. */
+type InferClientStreamData<Route>;
+/** The type of a whole client. */
+type ClientFor<Router>;
 ```
 
-`ClientFor<typeof router>` is the type of the whole client created from a
-contract.
-
-Each helper also accepts a client or route tree and infers a matching tree of
-types, so one exported type covers every route:
-
-```ts
-import type { InferClientResponse } from "@rest-rpc/core";
-
-export type ClientResponses = InferClientResponse<typeof client>;
-
-type PostResponse = ClientResponses["posts"]["get"];
-```
+- Each takes a client route, a route, or a whole tree, which returns a tree of
+  types: `InferClientResponse<typeof client>["posts"]["get"]`.
+- For a route rather than a client, pass `typeof globalHeaders` as
+  `InferClientRequest`'s second argument to make the headers it sets optional.

@@ -1,0 +1,265 @@
+---
+title: Errors
+description: Define errors on routes, throw them, and handle them typed on the client.
+---
+
+Errors are thrown, not returned. An error a route defines is typed on the
+client, with its code and `data`.
+
+## Define and Throw
+
+```ts
+const get = route
+	.get("/posts/:id")
+	.params(z.object({ id: z.string() }))
+	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.handler(({ params, errors }) => {
+		const post = findPost(params.id);
+		if (!post) throw errors.POST_NOT_FOUND({ data: { id: params.id } });
+		return post;
+	});
+```
+
+```ts
+type ErrorOptions = {
+	/** 400 to 599. Defaults to `400`. */
+	status?: number;
+	/** Schema of the error's `data`. */
+	data?: StandardSchema;
+	/** Schema of its response headers. */
+	headers?: StandardSchema;
+	/** Default message. Defaults to the code. */
+	message?: string;
+	/** Describes the error in OpenAPI. */
+	description?: string;
+};
+```
+
+Throwing takes these options, all optional unless the definition has a schema
+for them:
+
+```ts
+throw errors.POST_NOT_FOUND({
+	data: { id }, // required when the error has a `data` schema
+	headers: { "x-reason": "deleted" }, // required when it has a `headers` schema
+	cookies: ["session=; Max-Age=0"],
+	message: "Post was deleted", // replaces the default message
+	cause: error, // never sent
+});
+```
+
+- `data` and headers are validated when the error is created. Invalid values
+  throw an `INTERNAL_SERVER_ERROR` instead.
+- Error schemas must be synchronous, and are validated even with
+  `disableResponseValidation`.
+
+### Outside Handlers
+
+To throw from domain code, define the error once with `routeError()`, add it
+to routes, and throw it with `new`:
+
+```ts
+import { route, routeError } from "@rest-rpc/server";
+
+export const PostNotFound = routeError("POST_NOT_FOUND", {
+	status: 404,
+	data: z.object({ id: z.string() }),
+});
+
+export const findPost = (id: string) => {
+	const post = posts.get(id);
+	if (!post) throw new PostNotFound({ data: { id } });
+	return post;
+};
+
+const get = route
+	.get("/posts/:id")
+	.error(PostNotFound)
+	.handler(({ params }) => findPost(params.id));
+```
+
+- Adding the same definition twice, such as on a base and a route, is fine.
+- Adding a different error with the same code throws.
+
+## What's Sent
+
+Every error is a JSON response with the error's status:
+
+```http
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+
+{ "code": "POST_NOT_FOUND", "message": "Post not found", "data": { "id": "42" } }
+```
+
+- `data` is left out when the error has none.
+- The error's headers and cookies are sent as response headers.
+- `cause` is never sent.
+- Errors are always JSON, whatever codecs the app uses.
+
+## Defined and Undefined Errors
+
+Only errors the route defines are typed on the client. Any other `RouteError`
+is still sent with its status, code and `data`, and the client receives it
+untyped:
+
+```ts
+throw new RouteError("RATE_LIMITED", { status: 429 });
+```
+
+Define the errors callers handle per call, such as `POST_NOT_FOUND`. Leave
+errors every caller handles the same way, such as a rate limit, undefined and
+handle them in one place, such as a
+[client interceptor](/docs/client/fetch-client#interceptors). To type an error
+on many routes, define it on the builder they're built from.
+
+:::note
+A `RouteError` with the same code as a defined error is not the defined error.
+Throw the definition itself, `errors.CODE()` or `new PostNotFound()`, for the
+client to see it typed.
+:::
+
+## Built-in Errors
+
+The server sends these itself, untyped unless a route defines them:
+
+- `REQUEST_VALIDATION_FAILED` (`400`): request validation failed. `data` has
+  the issues by `body`, `query`, `params` and `headers`.
+- `MALFORMED_REQUEST_BODY` (`400`): the body can't be decoded.
+- `UNSUPPORTED_MEDIA_TYPE` (`415`): the route doesn't accept the request's
+  content type.
+- `INTERNAL_SERVER_ERROR` (`500`): a response failed validation, or anything
+  else was thrown and the app sends it.
+- `NOT_FOUND` (`404`): no route matches, with `createApp`.
+
+Add a built-in error to a route to type its `data`:
+
+```ts
+import { RequestValidationFailed, route } from "@rest-rpc/server";
+
+const create = route
+	.post("/posts")
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.error(RequestValidationFailed)
+	.handler(({ body }) => createPost(body));
+```
+
+### Other Thrown Errors
+
+A thrown value that isn't a `RouteError`, such as a plain `Error`:
+
+- With `createApp`, is sent as `INTERNAL_SERVER_ERROR`.
+- With [framework handlers](/docs/server/framework-integration), rejects for
+  the framework to handle.
+- Reaches [interceptors](/docs/server/interceptors), so they can log it.
+
+## Handle Errors on the Client
+
+A call resolves with a successful response and rejects otherwise.
+
+### With `safe()`
+
+`safe()` turns a call into `{ data }` or `{ error }`, with the error typed for
+the route. Use it for errors you expect, such as a post that doesn't exist:
+
+```ts twoslash
+// ---cut-start---
+// @filename: router.ts
+import { route } from "@rest-rpc/server";
+import * as z from "zod";
+
+const get = route
+	.get("/posts/:id")
+	.params(z.object({ id: z.string() }))
+	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.handler(({ params }) => ({
+		id: params.id,
+		title: "Hello",
+		body: "First post",
+	}));
+
+export const router = { posts: { get } };
+
+// @filename: client.ts
+import { createClient } from "@rest-rpc/core";
+import type { router } from "./router";
+declare function getContract(): typeof router;
+const client = createClient(getContract(), { origin: "http://localhost:3000" });
+// ---cut-end---
+import { isDefinedError, safe } from "@rest-rpc/core";
+
+const { error, data } = await safe(
+	client.posts.get({ params: { id: "post_1" } }),
+);
+
+if (isDefinedError(error) && error.code === "POST_NOT_FOUND") {
+	console.log(error.data.id);
+} else if (error) {
+	throw error;
+} else {
+	console.log(data.body);
+}
+```
+
+:::note
+`safe()` reads the error type from the call itself. A call wrapped in an
+`async` function or `.then()` loses it, so return the call directly and
+annotate the wrapper with `ClientPromise`.
+:::
+
+### With try/catch
+
+Use `try`/`catch` for general handling, such as logging or redirecting on
+`UNAUTHORIZED`. A caught error is `unknown`, so pass the client route or tree
+it can come from to `isDefinedError()` to type it:
+
+```ts
+try {
+	await client.posts.create({ body });
+} catch (error) {
+	if (
+		isDefinedError(error, client.posts.create) &&
+		error.code === "SLUG_TAKEN"
+	) {
+		console.log(error.message);
+	}
+	throw error;
+}
+
+// One handler for every route
+const handleError = (error: unknown) => {
+	if (isDefinedError(error, client) && error.code === "UNAUTHORIZED") {
+		redirectToSignIn();
+	}
+};
+```
+
+### What a Call Rejects With
+
+An error response with a JSON `code` rejects with a `RouteError`:
+
+```ts
+class RouteError extends Error {
+	code: string;
+	status: number;
+	/** The body's `message`, or the code. */
+	message: string;
+	/** Typed for defined errors. */
+	data: unknown;
+	headers: Record<string, string>;
+	/** `Set-Cookie` values. Always empty in browsers. */
+	cookies: readonly string[];
+	/** Whether the route defines this code with this status. */
+	isDefined: boolean;
+}
+```
+
+Everything else rejects with a plain `Error`:
+
+- Other error responses, such as a proxy's error page. Its `cause` holds the
+  received response.
+- Responses the route doesn't allow, such as an undefined 2xx status, a body
+  that can't be decoded, or one that fails
+  [response validation](/docs/client/fetch-client#response-validation).
+- No response at all, such as a network failure, timeout or abort, rejects
+  with the original error.

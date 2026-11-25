@@ -95,7 +95,7 @@ export type BodyCodecOperations =
  * codec with a pattern that matches it. `serialize` and `deserialize` are
  * selected separately.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#codec-selection}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
  */
 export type BodyCodec = {
 	mediaTypes: readonly (string | RegExp)[];

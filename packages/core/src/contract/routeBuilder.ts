@@ -179,7 +179,7 @@ export class RouteBuilder<
 		return new RouteBuilder(state) as never;
 	}
 
-	/** Prepends a path prefix to the route path, before a method is selected. @see {@link https://rest-rpc.vercel.app/docs/route-builder#path-prefixes} */
+	/** Prepends a path prefix to the route path, before a method is selected. @see {@link https://rest-rpc.vercel.app/docs/route-builder#stacking-calls} */
 	prefix<const TPrefix extends AbsolutePath>(
 		prefix: TPrefix & NoTrailingSlashCheck<TPrefix>,
 	): BuilderFor<TKind, WithPrefix<TState, TPrefix>> {
@@ -222,7 +222,7 @@ export class RouteBuilder<
 		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	/** Defines the request body. The route accepts the content types its headers declare in `content-type`, or JSON and `multipart/form-data` without one. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
+	/** Defines the request body. The route accepts the content types its headers declare in `content-type`, or JSON and `multipart/form-data` without one. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request} */
 	body<const TSchema extends StandardSchemaV1>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithBody<TState, TSchema>> {
@@ -231,7 +231,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Defines request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
+	/** Defines request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request} */
 	headers<const TSchema extends RecordSchema>(
 		schema: TSchema & LowercaseHeadersCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
@@ -240,7 +240,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Defines URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
+	/** Defines URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request} */
 	query<const TSchema extends RecordSchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "query", TSchema>> {
@@ -249,7 +249,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Defines path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
+	/** Defines path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request} */
 	params<const TSchema extends RecordSchema>(
 		schema: TSchema & RequiredParamsCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "params", TSchema>> {
@@ -277,7 +277,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Adds OpenAPI metadata, merged with earlier details. @see {@link https://rest-rpc.vercel.app/docs/openapi#operation-details} */
+	/** Adds OpenAPI metadata, merged with earlier details. @see {@link https://rest-rpc.vercel.app/docs/tooling/openapi#describe-routes} */
 	openAPI(
 		openApi: OpenApiRouteOptions,
 	): BuilderFor<TKind, NextState<TState, { openApi: true }>> {
@@ -288,7 +288,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Defines a successful response, JSON unless its headers declare a `content-type`. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
+	/** Defines a successful response, JSON unless its headers declare a `content-type`. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#defined-responses} */
 	response<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
@@ -308,7 +308,7 @@ export class RouteBuilder<
 			NewStatusCheck<TState, TOptions>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, { sse: TSchema }, TOptions>>;
-	/** Defines a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
+	/** Defines a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#defined-responses} */
 	response<const TOptions extends ResponseOptions | undefined = undefined>(
 		options?: TOptions &
 			LowercaseHeadersOptionCheck<TOptions> &
@@ -341,11 +341,11 @@ export class RouteBuilder<
 		return this.clone(addResponse(state, status, { ...definition, ...body }));
 	}
 
-	/** Adds an error defined with `routeError`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors} */
+	/** Adds an error defined with `routeError`. @see {@link https://rest-rpc.vercel.app/docs/errors#define-and-throw} */
 	error<const TDefinition extends AnyRouteErrorClass>(
 		definition: TDefinition,
 	): BuilderFor<TKind, WithError<TState, TDefinition>>;
-	/** Adds an error, the same as adding `routeError(code, options)`. The status defaults to 400. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors} */
+	/** Adds an error, the same as adding `routeError(code, options)`. The status defaults to 400. @see {@link https://rest-rpc.vercel.app/docs/errors#define-and-throw} */
 	error<
 		const TCode extends string,
 		const TOptions extends RouteErrorDefinitionOptions | undefined = undefined,

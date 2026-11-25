@@ -16,7 +16,7 @@ export type ValidationIssue = StandardSchemaV1.Issue;
  * Standard Schema validation issues grouped by HTTP request location, sent as
  * the `data` of `REQUEST_VALIDATION_FAILED` errors.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#built-in-errors}
  */
 export type RequestValidationIssues = {
 	body: readonly ValidationIssue[];
@@ -34,7 +34,7 @@ export type ResponseValidationLocation = "body" | "headers" | "stream" | "data";
  *
  * @remarks Define it with `.error()` to make clients recognize it.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#built-in-errors}
  */
 export const RequestValidationFailed = routeError("REQUEST_VALIDATION_FAILED", {
 	status: 400,
@@ -47,7 +47,7 @@ export const RequestValidationFailed = routeError("REQUEST_VALIDATION_FAILED", {
  *
  * @remarks Define it with `.error()` to make clients recognize it.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#built-in-errors}
  */
 export const MalformedRequestBody = routeError("MALFORMED_REQUEST_BODY", {
 	status: 400,
@@ -61,7 +61,7 @@ export const MalformedRequestBody = routeError("MALFORMED_REQUEST_BODY", {
  *
  * @remarks Define it with `.error()` to make clients recognize it.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#built-in-errors}
  */
 export const UnsupportedMediaType = routeError("UNSUPPORTED_MEDIA_TYPE", {
 	status: 415,
@@ -74,7 +74,7 @@ export const UnsupportedMediaType = routeError("UNSUPPORTED_MEDIA_TYPE", {
  *
  * @remarks Define it with `.error()` to make clients recognize it.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#built-in-errors}
  */
 export const NotFound = routeError("NOT_FOUND", {
 	status: 404,

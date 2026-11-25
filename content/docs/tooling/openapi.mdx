@@ -1,0 +1,173 @@
+---
+title: OpenAPI
+description: Generate an OpenAPI document from your routes.
+---
+
+```ts
+import { createOpenApiDocument } from "@rest-rpc/server";
+import * as z from "zod";
+
+const document = createOpenApiDocument(router, {
+	info: { title: "Blog API", version: "1.0.0" },
+	servers: [{ url: "https://api.example.com" }],
+	schemaConverter: (schema, mode) =>
+		z.toJSONSchema(schema as z.ZodType, { io: mode }),
+});
+```
+
+`createOpenApiDocument()` is also exported from `@rest-rpc/core`, for a shared
+contract.
+
+:::warning
+The document is a best-effort conversion, written for OpenAPI 3.2. Check it
+with the tools you use it with.
+:::
+
+## What's Documented
+
+Every route becomes an operation, with its method, path, parameters, request
+body, responses and errors.
+
+- Only responses defined with `.response()` are documented. A route with
+  inferred responses gets a placeholder `default` response.
+- Each defined error is a JSON response for its status. Errors that share a
+  status are documented as one response with a `oneOf`.
+- Built-in errors are documented only when the route defines them.
+- Streams are `text/event-stream` responses, and raw responses `default`.
+- Body content types come from the `content-type` in the headers schema. A
+  request body without one is `application/json` and `multipart/form-data`.
+- `content-type`, `accept` and `authorization` aren't listed as header
+  parameters. Describe credentials with `security`.
+- Query arrays are documented as `name[]`, the way the client sends them.
+
+## Schemas
+
+Standard Schema has no JSON Schema conversion, so pass a `schemaConverter`.
+Without it, or when it returns `undefined`, a schema is documented as `{}`.
+
+- Request schemas convert in `"input"` mode and response schemas in
+  `"output"` mode.
+- Whatever the converted schema carries ends up in the document, so Zod's
+  `.describe()` and `.meta()` describe parameters and bodies.
+
+```ts
+const postSchema = z
+	.object({
+		id: z
+			.string()
+			.meta({ description: "The post's id.", examples: ["post_1"] }),
+		title: z.string().describe("The post's title."),
+		body: z.string(),
+	})
+	.meta({ title: "Post", description: "A blog post." });
+```
+
+:::warning
+Don't set `id` in Zod's `.meta()` for documented schemas. Zod then turns the
+schema into a `#/$defs/...` reference, which doesn't resolve in an OpenAPI
+document.
+:::
+
+## Describe Routes
+
+`.openAPI()` sets operation fields. Responses and errors take a
+`description` in their own options:
+
+```ts
+const remove = route
+	.delete("/posts/:id")
+	.params(z.object({ id: z.string() }))
+	.openAPI({ summary: "Delete a post", tags: ["Posts"] })
+	.response({ status: 204, description: "Post deleted." })
+	.error("POST_NOT_FOUND", { status: 404, description: "No post has this id." })
+	.handler(({ params }) => deletePost(params.id));
+```
+
+```ts
+type OpenApiRouteOptions = {
+	summary?: string;
+	description?: string;
+	/**
+	 * Used by SDK generators for method names. Defaults to the route's path in
+	 * the route tree, such as `posts.get`. `""` leaves it out.
+	 */
+	operationId?: string;
+	/** Merged with the tags of earlier calls. */
+	tags?: string[];
+	deprecated?: boolean;
+	/** Security requirements, referencing schemes declared in `components`. */
+	security?: Array<Record<string, string[]>>;
+	externalDocs?: { url: string; description?: string };
+	/** `x-` fields, merged with those of earlier calls. */
+	extensions?: Record<`x-${string}`, unknown>;
+};
+```
+
+Calling `.openAPI()` again, such as on a route built from a base, merges
+`tags` and `extensions` and replaces the other fields:
+
+```ts
+const authenticated = route.openAPI({
+	tags: ["Authenticated"],
+	security: [{ bearerAuth: [] }],
+});
+
+const create = authenticated
+	.post("/posts")
+	.openAPI({ summary: "Create a post", tags: ["Posts"] });
+// tags: ["Authenticated", "Posts"], security: [{ bearerAuth: [] }]
+```
+
+## Transform Operations
+
+`transformOperation` changes each generated operation. It receives the route
+with its [metadata](/docs/middleware#metadata), so the rule middleware
+enforces can also be documented:
+
+```ts
+const document = createOpenApiDocument(router, {
+	components: {
+		securitySchemes: { bearerAuth: { type: "http", scheme: "bearer" } },
+	},
+	transformOperation: ({ route, operation }) =>
+		route.meta?.access === "signed-in"
+			? { ...operation, security: [{ bearerAuth: [] }] }
+			: operation,
+});
+```
+
+`route.meta` is typed by `DefaultMeta`, so augment it to read your keys.
+
+## Document Options
+
+```ts
+type CreateOpenApiDocumentOptions = {
+	/** Converts schemas to JSON Schema. */
+	schemaConverter?: (
+		schema: StandardSchemaV1,
+		mode: "input" | "output",
+	) => Record<string, unknown> | undefined;
+	/** Changes each generated operation. */
+	transformOperation?: (context: {
+		route: RouteDefinition;
+		/** The route's path in the route tree. */
+		routePath: readonly string[];
+		operation: OpenApiOperation;
+	}) => OpenApiOperation;
+	/** Defaults to `3.2.1`. */
+	openapi?: string;
+	/** `title` defaults to `"API"` and `version` to `"0.0.0"`. */
+	info?: { title?: string; version?: string; description?: string };
+	servers?: Array<{ url: string; description?: string }>;
+	components?: Record<string, unknown>;
+	tags?: Array<{ name: string; description?: string }>;
+	security?: Array<Record<string, string[]>>;
+	externalDocs?: { url: string; description?: string };
+	$self?: string;
+	jsonSchemaDialect?: string;
+	[key: `x-${string}`]: unknown;
+};
+```
+
+The document fields are copied to the document as they are, including any
+other fields their OpenAPI objects allow.

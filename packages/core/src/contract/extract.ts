@@ -105,7 +105,7 @@ const assertExtractedContract = (value: unknown, keys: string[]): void => {
  * export const client = createClient(contractFromJson<typeof router>(json));
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/contract-extraction#extract-routes-without-a-macro}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/contract-extraction#without-a-macro}
  */
 export function contractFromJson<TRouter extends Contract>(
 	json: unknown,

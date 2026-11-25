@@ -1,12 +1,12 @@
 ---
-title: Encoding and Content Types
-description: How params, query, headers and bodies are sent, and how to send other formats than JSON.
+title: Content Types and Codecs
+description: How requests and responses are encoded, and how to send formats other than JSON.
 ---
 
 ## Params, Query and Headers
 
-The client sends each value with `String()`, and the server's schemas receive
-the strings:
+The client turns each value into a string, and the server's schemas receive
+strings:
 
 ```ts twoslash
 import { createClient } from "@rest-rpc/core";
@@ -20,57 +20,40 @@ const search = route
 	.query(
 		z.object({
 			page: z.coerce.number().optional(),
-			sort: z.enum(["new", "top"]).optional(),
 			tags: z.array(z.string()).optional(),
 		}),
 	)
-	.headers(z.object({ "x-request-id": z.string() }))
 	.handler(({ params, query }) => findPosts(params.id, query));
 // ---cut-start---
 const client = createClient({ search }, { origin: "http://localhost" });
 // ---cut-end---
 
-const { body } = await client.search({
+await client.search({
 	params: { id: 7 },
-	query: { page: 2, sort: "new", tags: ["news", "release"] },
-	headers: { "x-request-id": "r1" },
+	query: { page: 2, tags: ["news", "release"] },
 });
-// GET /users/7/posts?page=2&sort=new&tags[]=news&tags[]=release
+// GET /users/7/posts?page=2&tags[]=news&tags[]=release
 ```
 
-- Arrays are sent as `key[]` keys, and only those become arrays, so HTML forms
-  name the field `tags[]`. A repeated key without `[]` keeps its last value:
-  `?tag=a&tag=b` is received as `{ tag: "b" }`.
-- `undefined` values and empty arrays are left out. Other values are sent as
-  `String()` makes them: a `Date` in local time, such as
-  `"Fri Nov 20 2026 12:00:00 GMT+0000 (Coordinated Universal Time)"`,
-  rather than an ISO string, and an object as `"[object Object]"`. Send dates
-  with `toISOString()`, and objects as separate keys.
-- Booleans arrive as `"true"` and `"false"`, so a schema reads them by value,
-  such as with `z.stringbool()`. Coercing by truthiness, as `z.coerce.boolean()`
-  does, reads every non-empty string as `true`, `"false"` included.
-- Header names are sent lowercase, and response headers are sent with
-  `String()` too.
+- Arrays are sent as `key[]` keys, and only those become arrays. A repeated
+  key without `[]` keeps its last value.
+- `undefined` values and empty arrays are left out.
+- Header names are lowercase.
+
+:::warning[Values are sent with `String()`]
+
+- A `Date` becomes a local time string, not ISO. Send `toISOString()`.
+- An object becomes `"[object Object]"`. Send its fields as separate keys.
+- Booleans become `"true"` and `"false"`. Read them with `z.stringbool()`:
+  `z.coerce.boolean()` reads `"false"` as `true`.
+  :::
 
 ## Bodies
 
-The `content-type` header says how a body is encoded, and a body sent without
-one is encoded as `application/json`. `FormData` is the exception: it is always
-sent as `multipart/form-data`. A route
-declares the request content types it accepts in its headers schema, and a
-handler sets the response's with `respond()`:
+A body is JSON unless its `content-type` header says otherwise. `FormData` is
+always sent as `multipart/form-data`:
 
-```ts twoslash
-import { createClient } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
-import * as z from "zod";
-declare function savePostImage(
-	id: string,
-	image: FormDataEntryValue | null,
-): { url: string };
-declare function findPostImage(id: string): Blob;
-declare const file: File;
-// ---cut---
+```ts
 const upload = route
 	.post("/posts/:id/image")
 	.body(z.instanceof(FormData))
@@ -80,250 +63,72 @@ const image = route.get("/posts/:id/image").handler(({ params, respond }) => {
 	const image = findPostImage(params.id);
 	return respond(image, { headers: { "content-type": image.type } });
 });
-// ---cut-start---
-const client = createClient(
-	{ posts: { upload, image } },
-	{ origin: "http://localhost" },
-);
-// ---cut-end---
-
-const form = new FormData();
-form.set("image", file);
-const uploaded = await client.posts.upload({
-	params: { id: "post_1" },
-	body: form,
-});
-const { body } = await client.posts.image({ params: { id: "post_1" } });
 ```
 
-### Request Content Type
+```ts
+const form = new FormData();
+form.set("image", file);
+await client.posts.upload({ params: { id: "post_1" }, body: form });
+```
 
-The client sends a request body with the first content type that applies:
-
-1. `multipart/form-data` for `FormData`, whatever the headers say. The runtime
-   sets the header with the boundary it generates. A route that declares
-   `multipart/form-data` still requires the header in the call, but only for
-   the types: the server validates the header it receives, with the boundary.
-2. The `content-type` header. Like other headers, the call's overrides one in
-   `additionalHeaders`, which overrides one in `globalHeaders`.
-3. `application/json`.
-
-### Response Content Type
-
-The server sends a response body with the first content type that applies:
-
-1. A returned `Response` as it is, without a codec.
-2. `multipart/form-data` for `FormData`, whatever the headers say.
-3. [Server-Sent Events](/docs/server-sent-events) for an async iterable,
-   unless the handler sets another `content-type`.
-4. The `content-type` header the handler sets with `respond()`, which a
-   response's headers schema has to
-   [let through](/docs/http-behavior/validation#responses) when it has one.
-5. `application/json`.
-
-The body's value doesn't choose the content type, so a `Blob` without a
-`content-type` is encoded as JSON too.
-
-[Errors](/docs/http-behavior/errors) are always JSON, and the client reads a
-response without a `content-type` as having no body.
+- The value doesn't choose the content type. A `Blob` returned without a
+  `content-type` header is sent as JSON.
+- A request body's content type comes from the call's `content-type` header,
+  then the client's headers, then JSON.
+- A response body's content type comes from the `content-type` header set with
+  `respond()`, then JSON. An async iterable is always a stream, and a returned
+  `Response` is sent as it is.
+- [Errors](/docs/errors) and [streams](/docs/server-sent-events) are always
+  JSON and `text/event-stream`, whatever codecs say.
 
 ### Accepted Content Types
 
-The server accepts a request body in the content types the headers schema
-declares. A route that declares none accepts `application/json` and
-`multipart/form-data`, not any content type:
-
-- A content type the headers schema rejects fails
-  [validation](/docs/http-behavior/validation#requests) with `400`.
-- A route that declares none answers any other content type with
-  [`UNSUPPORTED_MEDIA_TYPE`](/docs/http-behavior/errors#built-in-errors) and
-  `415`. It also receives `FormData` when a client sends it, so its body
-  schema decides whether to accept it.
-- A request without a `content-type` is read as having no body. The client
-  sets `application/json` itself, but other clients have to send it, and
-  `curl -d` sends `application/x-www-form-urlencoded` unless told otherwise.
-- Headers schemas see the base media type without parameters: for
-  `multipart/form-data; boundary=----x`, the schema sees
-  `multipart/form-data`, so `z.literal("multipart/form-data")` matches what
-  the browser sends, and codecs receive the full header.
-
-## Codecs
-
-A codec encodes and decodes the bodies of a content type. Custom codecs are
-passed in `bodyCodecs`, and the built-in ones handle the rest.
-
-:::note[Codecs don't apply to SSE or errors]
-[Server-Sent Events](/docs/server-sent-events) are standard
-`text/event-stream` responses, and [errors](/docs/http-behavior/errors) are
-standard JSON responses. Neither can be customized with codecs: a codec for
-`text/event-stream` is never called, and a codec that matches
-`application/json` never reads an error. Event data has its own
-[data format](/docs/server-sent-events#data-format) option.
-:::
-
-### Codec Selection
-
-Both sides select a codec by the base media type of the `content-type` on the
-wire, lowercase and without parameters. The receiving side uses the content
-type it receives, not the one the route declares:
-
-1. A custom codec in `bodyCodecs` that lists the media type as a string.
-2. The first custom codec with a pattern that matches it.
-3. The same for the built-in codecs.
-
-A custom codec replaces the built-in ones for every media type it matches, so
-`bodyCodec(/.*/, ...)` handles every body. `serialize` and `deserialize` are
-selected separately, so a codec with only `deserialize` leaves `serialize` to
-the next codec that matches, usually the built-in one, and the other way
-around.
-
-### Built-in Codecs
-
-The built-in codecs are exported from `@rest-rpc/core` and `@rest-rpc/server`
-so a [custom codec](#custom-codecs) can call one for the values it doesn't
-handle. They are selected in this order, and the binary codec matches every
-media type the others don't:
+A route declares the request content types it accepts in its headers schema:
 
 ```ts
-/** `application/json` and `*+json`. Throws for values JSON can't encode, such as `undefined`. */
-const jsonCodec: {
-	serialize(value: unknown): string;
-	deserialize(body: IncomingBody): Promise<unknown>;
-};
-
-/** `application/x-www-form-urlencoded`. */
-const urlEncodedCodec: {
-	serialize(value: unknown): URLSearchParams; // throws for other values
-	deserialize(body: IncomingBody): Promise<URLSearchParams>;
-};
-
-/** `multipart/form-data`. */
-const formDataCodec: {
-	serialize(value: unknown): FormData; // throws for other values
-	deserialize(body: IncomingBody): Promise<FormData>;
-};
-
-/** `text/*`, decoded as UTF-8. */
-const textCodec: {
-	serialize(value: unknown): string; // throws for other values
-	deserialize(body: IncomingBody): Promise<string>;
-};
-
-/** Every other media type. Streams are sent as their chunks arrive. */
-const binaryCodec: {
-	serialize(
-		value: unknown,
-	): Blob | Uint8Array | ReadableStream | AsyncIterable<string | Uint8Array>;
-	deserialize(body: IncomingBody): Promise<Blob>; // whatever was sent
-};
+route
+	.post("/posts")
+	.headers(z.object({ "content-type": z.literal("text/plain") }))
+	.body(z.string())
+	.handler(({ body }) => createPost({ title: "Untitled", body }));
 ```
 
-The schema of a non-JSON body describes that value, such as `z.string()` for
-`text/plain` and `z.instanceof(Blob)` for a file. The client's type stays the
-schema's, so see [what the client receives](#what-the-client-receives) when a
-codec gives it another value.
-
-The default codecs read a body whole: the server before the handler runs, and
-the client before the call resolves. To stream binary data or large text, use
-a [custom codec](#custom-codecs) whose `deserialize` returns `body.body`.
-
-### Serialization Errors
-
-A built-in codec's `serialize` throws a `BodySerializationError` for a value
-it doesn't encode, such as a plain object sent as `image/png`. It extends
-`TypeError`, and says what was expected and received:
-
-```ts
-class BodySerializationError extends TypeError {
-	/** The base media type the value was serialized for. */
-	readonly mediaType: string | undefined;
-	/** The kinds of values the codec encodes, such as `["FormData"]`. */
-	readonly expected: readonly string[];
-	/** The kind of the received value, such as `"Object"`. Not the value itself. */
-	readonly received: string;
-}
-```
-
-- The server throws it while it serializes a response, after the handler and
-  middleware have run. The client rejects the call with it before the request
-  is sent.
-- The JSON codec throws the errors of `JSON.stringify` instead, such as for a
-  `bigint`.
-- `mediaType` is `undefined` when a custom codec calls a built-in one without
-  headers.
+- Without one, a route accepts `application/json` and `multipart/form-data`,
+  and answers anything else with `UNSUPPORTED_MEDIA_TYPE` (`415`).
+- The schema sees the media type without parameters, such as
+  `multipart/form-data` without its boundary.
+- A request without a `content-type` has no body. The rest-rpc client sets it
+  for you, but other clients have to: `curl -d` sends
+  `application/x-www-form-urlencoded`.
 
 ## What the Client Receives
 
-The client's result type is the response schema's output, or the handler's
-return type without one, but the body went through a codec on the way, so the
-value at runtime can differ from its type. A value JSON can't represent
-arrives as what JSON made of it:
+The client's types are the schema's output, or the handler's return type, but
+the value went through JSON on the way:
 
-```ts twoslash
-import { createClient } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
-import * as z from "zod";
-// ---cut---
+```ts
 const get = route
 	.get("/posts/:id")
-	.response(z.object({ title: z.string(), publishedAt: z.date() }))
 	.handler(() => ({ title: "Hello", publishedAt: new Date() }));
-// ---cut-start---
-const client = createClient({ posts: { get } }, { origin: "http://localhost" });
-// ---cut-end---
 
 const { body } = await client.posts.get({ params: { id: "1" } });
-body.publishedAt; // the string "2026-11-17T12:00:00.000Z" at runtime
+body.publishedAt; // typed as Date, but the string "2026-11-17T12:00:00.000Z"
 ```
 
-Use schemas whose output is what JSON sends, such as `z.iso.datetime()`,
-restore the value on the client with a `z.coerce.date()` schema and
-[`validateResponses`](/docs/client/fetch-client#response-validation), or send
-it with a [codec that keeps the types](#custom-codecs).
+:::warning
 
-A binary body arrives as a `Blob`, whatever the server sent, and a stream is
-read to the end before the call resolves:
-
-```ts twoslash
-import { createClient } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
-declare function exportPost(id: string): Uint8Array;
-// ---cut---
-const download = route.get("/posts/:id/export").handler(({ params, respond }) =>
-	respond(exportPost(params.id), {
-		headers: { "content-type": "application/octet-stream" },
-	}),
-);
-// ---cut-start---
-const client = createClient({ download }, { origin: "http://localhost" });
-// ---cut-end---
-
-const { body } = await client.download({ params: { id: "1" } });
-body; // a Blob at runtime
-```
-
-Type binary bodies as `Blob`, or receive the value that was sent with a
-[codec that marks it](#codec-headers).
-
-:::note[Why the defaults don't keep the types]
-The defaults stick to formats every client understands. Keeping a `Date`
-changes the JSON on the wire, so other clients would have to understand that
-format too. Keeping a `Uint8Array` means sending a header the HTTP standards
-don't define, which cross-origin apps would also have to expose with CORS. A
-custom codec makes that choice for your API.
-:::
+- Use schemas whose output is what JSON sends, such as `z.iso.datetime()`,
+  or a [codec](#custom-codecs) that keeps the types.
+- Type binary bodies as `Blob`, which is what they arrive as.
+- Bodies are read whole before the call resolves. To stream a large body, use
+  a codec whose `deserialize` returns `body.body`.
+  :::
 
 ## Custom Codecs
 
-`bodyCodec(mediaTypes, { serialize, deserialize })` encodes another format.
-Pass the same codec in `bodyCodecs` to the client and the server.
-
-A common reason is values JSON can't represent. A `Date` returned by a handler
-is typed as a `Date` on the client but [arrives as a string](#what-the-client-receives),
-and a `Map`, `Set` or `bigint` doesn't survive at all.
-[superjson](https://www.npmjs.com/package/superjson) encodes them as JSON with
-the type of each value, so they arrive as what the types say. Set its content
-type once, on a base route whose middleware sends every response with it:
+A codec encodes and decodes bodies of a content type. Pass the same codecs to
+the server and the client in `bodyCodecs`. This one keeps `Date` and other
+types with [superjson](https://www.npmjs.com/package/superjson):
 
 ```ts
 import { bodyCodec, createClient } from "@rest-rpc/core";
@@ -335,6 +140,7 @@ const superjsonCodec = bodyCodec("application/vnd.superjson+json", {
 	deserialize: async (body) => superjson.parse(await body.text()),
 });
 
+// Sends every response of routes built from it as superjson
 const superjsonRoute = route.use(async ({ next }) => {
 	const response = await next();
 	return {
@@ -346,37 +152,47 @@ const superjsonRoute = route.use(async ({ next }) => {
 	};
 });
 
-const get = superjsonRoute
-	.get("/posts/:id")
-	.handler(({ params }) => ({ id: params.id, publishedAt: new Date() }));
-
 createApp(router, { bodyCodecs: [superjsonCodec] });
 const client = createClient(getContract(), { bodyCodecs: [superjsonCodec] });
-
-const { body } = await client.posts.get({ params: { id: "1" } });
-body.publishedAt; // a Date, as typed
 ```
 
-- `mediaTypes` is a media type, a pattern such as `/\+json$/`, or a list. See
-  [Codec Selection](#codec-selection) for which codec a media type selects.
-  Here the `+json` suffix says the format is JSON underneath, so clients
-  without the codec still read it as JSON.
-- `serialize` returns a string, bytes, a `Blob`, `FormData`,
-  `URLSearchParams` or a stream, and `deserialize` reads the body with the
-  Fetch body methods, such as `text()` and `arrayBuffer()`. A body that fails to decode is answered with
-  [`MALFORMED_REQUEST_BODY`](/docs/http-behavior/errors#built-in-errors) and
-  `400`.
-- A stream returned from a route on the base is sent to the codec, which
-  can't encode it, so build stream routes from `route`.
-- To receive request bodies in the format too, declare its content type in
-  the route's [headers schema](#accepted-content-types).
+```ts
+function bodyCodec(
+	/** A media type, a pattern such as `/\+json$/`, or a list. */
+	mediaTypes: string | RegExp | readonly (string | RegExp)[],
+	/** At least one of the two. */
+	operations: {
+		/**
+		 * Returns a string, bytes, `Blob`, `FormData`, `URLSearchParams` or a
+		 * stream, or a promise of one. Receives the headers sent with the body.
+		 */
+		serialize?: (value: unknown, headers: Record<string, string>) => BodyValue;
+		/**
+		 * Reads the body with Fetch body methods such as `text()`, and returns
+		 * the value the schema validates. Receives the headers as received.
+		 */
+		deserialize?: (
+			body: IncomingBody,
+			headers: Record<string, string>,
+		) => unknown;
+	},
+): BodyCodec;
+```
+
+- A custom codec is chosen before the built-in ones for every media type it
+  matches. An exact string match wins over a pattern.
+- `serialize` and `deserialize` are chosen separately, so a codec with only
+  one leaves the other to the built-in codec.
+- A body `deserialize` fails on is answered with `MALFORMED_REQUEST_BODY`
+  (`400`).
+- To receive request bodies in the format, declare its content type in the
+  route's [headers schema](#accepted-content-types).
 
 ### Codec Headers
 
-A codec also receives the headers sent with a body, and can send its own with
-`serializedBody(body, { headers })`. This one marks a `Uint8Array` with a
-header, so the other side decodes it as a `Uint8Array` instead of a `Blob`,
-and leaves other values to the built-in binary codec:
+A codec receives the headers sent with a body, and can add its own with
+`serializedBody()`. This one marks a `Uint8Array` so it arrives as one instead
+of a `Blob`:
 
 ```ts
 import { binaryCodec, bodyCodec, serializedBody } from "@rest-rpc/core";
@@ -391,24 +207,41 @@ const bytes = bodyCodec("application/octet-stream", {
 			? new Uint8Array(await body.arrayBuffer())
 			: binaryCodec.deserialize(body),
 });
-
-createApp(router, { bodyCodecs: [bytes] });
-const client = createClient(getContract(), { bodyCodecs: [bytes] });
-
-const { body } = await client.download({ params: { id: "1" } });
-body; // a Uint8Array, as typed
 ```
 
-- `serialize` receives the headers sent with the body, and `deserialize` the
-  received ones. Names are lowercase, and `content-type` keeps parameters
-  such as `charset`. On the client, `serialize` doesn't see headers that
-  interceptors add.
-- The headers a codec returns replace the headers of the same name that a
-  handler or a call sets, so check a header before replacing it, and return
-  only the headers the codec adds or changes.
-- A codec may send another `content-type`, and the receiving side decodes the
-  body with the codec of the content type it receives. The route's types and
-  the [OpenAPI document](/docs/openapi) still show the declared one.
-- Browsers hide response headers from cross-origin requests unless the server
-  lists them in `Access-Control-Expose-Headers`, so add `x-body` there when
-  the client runs on another origin.
+- Headers a codec returns replace those of the same name set by a handler or
+  call.
+- Browsers hide custom response headers from cross-origin requests unless the
+  server lists them in `Access-Control-Expose-Headers`.
+
+### Built-in Codecs
+
+The built-in codecs are exported, so a custom codec can fall back to them:
+
+```ts
+/** `application/json` and `*+json`. */
+const jsonCodec: BodyCodec;
+/** `application/x-www-form-urlencoded`, as `URLSearchParams`. */
+const urlEncodedCodec: BodyCodec;
+/** `multipart/form-data`, as `FormData`. */
+const formDataCodec: BodyCodec;
+/** `text/*`, as a string. */
+const textCodec: BodyCodec;
+/** Every other media type. Sends bytes, a `Blob` or a stream, and receives a `Blob`. */
+const binaryCodec: BodyCodec;
+```
+
+A built-in codec throws a `BodySerializationError` for a value it can't
+encode, such as an object sent as `image/png`. The server throws it after the
+handler runs, and the client before the request is sent:
+
+```ts
+class BodySerializationError extends TypeError {
+	/** The media type the value was serialized for. */
+	readonly mediaType: string | undefined;
+	/** The kinds of values the codec encodes, such as `["FormData"]`. */
+	readonly expected: readonly string[];
+	/** The kind of value received, such as `"Object"`. */
+	readonly received: string;
+}
+```

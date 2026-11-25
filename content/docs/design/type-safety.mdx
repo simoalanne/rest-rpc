@@ -1,0 +1,193 @@
+---
+title: Type Safety
+description: What the types protect, and where they deliberately stop.
+---
+
+An API is a promise between a server and its callers, and most bugs at that
+boundary are a broken promise: a renamed field, a missing param, an error
+nobody handles. rest-rpc puts much of its effort into types because the
+compiler is the cheapest place to catch them. It checks every call on every
+change, before anything runs, and a type check tells a developer or an agent
+whether a change is complete.
+
+Types come from the route definitions themselves. Nothing is generated, so a
+change to a route reaches every caller as soon as the editor sees it. The
+client gets the same types through `typeof router`, without importing server
+code.
+
+## What Types Protect
+
+### Calls Match Routes
+
+```ts
+client.posts.get({ params: { id: 1 } }); // type error: id is a string
+client.posts.get(); // type error: params are required
+
+const { body } = await client.posts.get({ params: { id: "post_1" } });
+body.titel; // type error: did you mean title?
+```
+
+- A call takes each schema's input, and a handler receives its output, so
+  coercions and defaults are typed on both sides.
+- Segments the server always receives, such as an optional query, can be
+  left out of a call. A header the client's `globalHeaders` always send
+  becomes optional too.
+- A response with several defined statuses is a union, narrowed by `status`.
+
+### Handlers Match Definitions
+
+```ts
+route
+	.post("/posts")
+	.response(post, { status: 201 })
+	.handler(({ respond }) => respond(draft, { status: 202 })); // type error: 202 isn't defined
+
+route.get("/").handler(
+	({ respond }) => respond("ok", { headers: { "Content-Type": "text/plain" } }), // type error: lowercase names
+);
+```
+
+- A defined response types what the handler returns, and `respond()` accepts
+  only the defined statuses.
+- A route declared with `raw()` must return a `Response`.
+
+### The Builder Only Offers What Fits
+
+Each call narrows what the next can be, so an invalid route can't be written:
+
+- After `.get()`, there's no `.body()` and no second method.
+- `.prefix()` exists only before a method is chosen.
+- A status or error code can't be defined twice, and success statuses are
+  `200` to `299`.
+- `.static()` exists only on routes that read nothing from the request and run
+  no middleware.
+
+### Requirements Reach the Caller
+
+What a route needs is part of its type, so whoever serves or calls it must
+provide it:
+
+```ts
+const auth = route.middleware<{
+	errors: { UNAUTHORIZED: typeof Unauthorized };
+}>(({ next }) => next());
+route.get("/me").use(auth); // type error: the route doesn't define UNAUTHORIZED
+
+createApp({ me }); // type error: the routes require a user in context
+```
+
+- Initial context is required by `createApp`, route handlers, `call()` and
+  MCP tools alike.
+- A [contract](/docs/contract-first) implementation must match the contract's
+  requests, responses and errors.
+
+### Errors Are Typed per Route
+
+A route's defined errors, with their codes, statuses and `data`, are typed on
+the client through `safe()`, `isDefinedError()` and TanStack Query's `error`.
+See [Errors](/docs/errors#handle-errors-on-the-client).
+
+### Mistakes Read Clearly
+
+Where TypeScript's own message wouldn't explain the problem, the type error
+says what to do instead, such as "Return a Response directly. respond()
+options don't apply to it."
+
+## Where Types Stop
+
+Some gaps are limits of TypeScript. Others are deliberate, because a type
+costs more than it protects:
+
+- **Slow to check.** Route definitions keep schema types as they are instead
+  of expanding them, so large route trees stay fast to check.
+- **Hard to satisfy or read.** A type that rejects valid code, or whose error
+  takes longer to understand than the bug it prevents, gets in the way.
+- **Hard to build and maintain.** Some cases would need complex type-level
+  code to catch a rare mistake. That code is a source of bugs itself, and
+  every later change has to keep it working.
+
+### Limits of TypeScript
+
+- **Thrown errors aren't typed.** TypeScript doesn't track what a function
+  throws, so routes declare errors with `.error()`. Throwing one the route
+  doesn't define still compiles, and the client receives it untyped.
+- **Literals widen in variables.** TypeScript widens `"draft"` to `string`
+  in a variable, so a value built there before it's returned loses the
+  literal. See [Inferred Responses](/docs/route-builder#inferred-responses).
+
+### What the Wire Changes
+
+Types describe the values you write, not how they travel:
+
+- **JSON**: a `Date` is typed as a `Date` and arrives as a string. A `Map`
+  arrives as `{}`, and `undefined` properties are left out. Modeling JSON in
+  every type would make them harder to read, and wrong for
+  [codecs](/docs/http-behavior/encoding) that do keep a `Date`.
+- **Binary**: a `Uint8Array`, `ReadableStream` or async iterable arrives as a
+  `Blob`. The bytes don't say which one was sent. Keeping that would mean
+  replacing your content type, or adding a custom header with a hint that
+  browsers then need CORS to expose.
+- **Coercing schemas**: a schema whose input is `unknown`, such as Zod's
+  `z.coerce.number()`, lets the client send any value.
+
+[Local calls](/docs/client/local-calls) skip the wire, so values arrive as the
+handler returned them.
+
+### Deliberate Trade-offs
+
+- **Undefined errors are untyped.** Errors every caller handles the same way,
+  such as a rate limit, stay out of each call's error type, so it lists only
+  what's worth handling per call.
+- **A returned `Response` is untyped.** The route's result becomes
+  `status: number` and `body: unknown`. Its defined errors stay typed.
+- **Inferred responses aren't validated.** Without `.response()`, the type is
+  what the handler returns, and nothing checks it at runtime. Requiring a
+  schema would mean writing a complex type twice, such as a row your ORM
+  already types, even when you know it's correct. Add `.response()` where
+  the runtime check or exact shape is worth it.
+- **Disabled validation keeps the types.** With `disableRequestValidation` or
+  `disableResponseValidation`, types stay as if the schemas ran. They're an
+  escape hatch for special cases, or for debugging what goes over the wire.
+  To skip the runtime check on one response your own code already gets
+  right, define it with
+  [`type<T>()`](/docs/http-behavior/validation#types-without-validation)
+  instead.
+- **Extracted contracts have no schemas.** The client is fully typed, but it
+  can't validate responses at runtime.
+
+## Verifying the Types
+
+Types this complex can only be trusted to protect the runtime if they're
+verified the same way the runtime is. A type that silently accepts a mistake
+protects nothing, and nothing warns when it does. So each guarantee on this
+page has a type test, in a
+`*.test-d.ts` file next to the source, that Vitest type-checks with
+`vitest --typecheck`:
+
+```ts
+it("rejects a second response for the same status", () => {
+	route.get("/").response(post).response({ status: 204 });
+	// @ts-expect-error The route already defines a response for this status.
+	route.get("/").response(post).response(post);
+});
+```
+
+- `expectTypeOf` checks that a type is exactly what's expected, such as a
+  call's result.
+- `@ts-expect-error` checks that a mistake is rejected. If the line ever
+  compiles, the test fails, so a mistake that's caught today stays caught.
+- The [`declarations`](https://github.com/simoalanne/rest-rpc/blob/main/declarations/src/index.ts) package builds the
+  public API the way a library would and emits declarations, so every
+  exported type can be named outside rest-rpc.
+
+The types and their tests live next to the code they describe:
+
+- **Route definitions and requests**:
+  [`contract/routeBuilder.types.ts`](https://github.com/simoalanne/rest-rpc/blob/main/packages/core/src/contract/routeBuilder.types.ts),
+  [`contract/request.ts`](https://github.com/simoalanne/rest-rpc/blob/main/packages/core/src/contract/request.ts),
+  [`contract/response.ts`](https://github.com/simoalanne/rest-rpc/blob/main/packages/core/src/contract/response.ts)
+- **Client calls and results**:
+  [`client/request.ts`](https://github.com/simoalanne/rest-rpc/blob/main/packages/core/src/client/request.ts),
+  [`client/response.ts`](https://github.com/simoalanne/rest-rpc/blob/main/packages/core/src/client/response.ts)
+- **Handlers, middleware and context**:
+  [`builder/routeBuilder.types.ts`](https://github.com/simoalanne/rest-rpc/blob/main/packages/server/src/builder/routeBuilder.types.ts)

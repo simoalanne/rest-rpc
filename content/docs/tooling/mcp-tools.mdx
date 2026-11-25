@@ -1,0 +1,220 @@
+---
+title: MCP Tools
+description: Give agents your routes as MCP server tools or agent SDK tools.
+---
+
+`createToolsFromRoutes()` turns routes into tools that agents can call. A
+route already has a name, schemas and a handler, so there's nothing to write
+by hand, and each tool call runs the route with its validation and
+middleware.
+
+```ts tools.ts
+import { createToolsFromRoutes } from "@rest-rpc/server";
+import * as z from "zod";
+import { router } from "./router.ts";
+
+export const tools = createToolsFromRoutes(router, {
+	schemaConverter: (schema, io) => z.toJSONSchema(schema as z.ZodType, { io }),
+});
+```
+
+:::warning[JSON only]
+Tool arguments and results are JSON. Routes declaring other content types are
+left out. A route without a response schema that returns a non-JSON body fails
+the call with `INTERNAL_SERVER_ERROR`.
+:::
+
+Models choose tools by their names and descriptions, so describe routes with
+`.openAPI({ summary })` and fields with `.describe()`:
+
+```ts
+const search = route
+	.get("/posts/search")
+	.query(z.object({ text: z.string().describe("Words to find in posts") }))
+	.openAPI({ summary: "Search posts by their title and body" })
+	.handler(({ query }) => searchPosts(query.text));
+```
+
+## Tools
+
+Each tool is plain data shaped like an MCP tool, with a function that calls
+the route:
+
+```ts
+type ToolFromRoute = {
+	definition: {
+		/** The route's path in the tree joined with `_`, such as `posts_search`. */
+		name: string;
+		/** The `.openAPI()` summary. */
+		title?: string;
+		/** The `.openAPI()` description, otherwise the summary, otherwise `GET /posts/search`. */
+		description?: string;
+		/** An object of the route's `params`, `query`, `headers` and `body`. */
+		inputSchema: JsonSchema;
+		/** The body schema of the route's only defined response. */
+		outputSchema?: JsonSchema;
+		/** `readOnlyHint` for `GET`, `idempotentHint` for `PUT` and `DELETE`. */
+		annotations?: ToolAnnotations;
+	};
+	/** Runs the route with the model's arguments. Never rejects. */
+	call: (
+		args: Record<string, unknown>,
+		options?: ToolCallOptions,
+	) => Promise<ToolResult>;
+	/** The route's definition, with its metadata. */
+	route: RouteDefinition;
+	/** The route's path in the tree, such as `["posts", "search"]`. */
+	routePath: readonly string[];
+};
+```
+
+`tools` is an array, so filter or change tools with array methods, such as by
+[metadata](/docs/middleware#metadata):
+
+```ts
+const agentTools = tools.filter(({ route }) => route.meta?.access !== "admin");
+```
+
+## Serve over MCP
+
+Register the tools on an
+[MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io) server:
+
+```ts server.ts
+import {
+	createMcpHandler,
+	fromJsonSchema,
+	McpServer,
+} from "@modelcontextprotocol/server";
+import { createApp } from "@rest-rpc/server";
+import { router } from "./router.ts";
+import { tools } from "./tools.ts";
+
+const mcp = createMcpHandler(({ requestInfo }) => {
+	const server = new McpServer({ name: "blog", version: "1.0.0" });
+	for (const { definition, call } of tools) {
+		const { name, inputSchema, outputSchema, ...config } = definition;
+		server.registerTool(
+			name,
+			{
+				...config,
+				inputSchema: fromJsonSchema<Record<string, unknown>>(inputSchema),
+				...(outputSchema && { outputSchema: fromJsonSchema(outputSchema) }),
+			},
+			(args, { mcpReq }) =>
+				call(args, {
+					signal: mcpReq.signal,
+					headers: {
+						authorization: requestInfo?.headers.get("authorization") ?? "",
+					},
+				}),
+		);
+	}
+	return server;
+});
+
+const app = createApp(router);
+
+export default {
+	fetch: (request: Request) =>
+		new URL(request.url).pathname === "/mcp"
+			? mcp.fetch(request)
+			: app.fetch(request),
+};
+```
+
+```ts
+type ToolCallOptions = {
+	/** The initial context the routes require, as with `createApp`. */
+	context?: object;
+	/** Headers from the host, such as `authorization`. They replace the model's. */
+	headers?: Record<string, string>;
+	signal?: AbortSignal;
+};
+```
+
+## Use in an Agent SDK
+
+An agent in your own process doesn't need MCP. Map the tools to the
+SDK's, such as the [AI SDK](https://ai-sdk.dev)'s:
+
+```ts
+import { jsonSchema, tool } from "ai";
+
+const agentTools = Object.fromEntries(
+	tools.map(({ definition, call }) => [
+		definition.name,
+		tool({
+			description: definition.description,
+			inputSchema: jsonSchema<Record<string, unknown>>(definition.inputSchema),
+			execute: async (args) => {
+				const result = await call(args);
+				if (result.isError) throw new Error(result.content[0]?.text);
+				return result.structuredContent;
+			},
+		}),
+	]),
+);
+```
+
+## Results
+
+A tool call returns an MCP `CallToolResult` with the response body. Status,
+headers and cookies are left out, so return what an agent needs, such as a
+created post's ID, in the body.
+
+- A body is `structuredContent`, and JSON text in `content`.
+- No body is an empty `content`.
+- A `RouteError` is `isError`, with the error as JSON, so the model can fix
+  its arguments:
+
+```json
+{
+	"code": "POST_NOT_FOUND",
+	"status": 404,
+	"message": "Post not found.",
+	"data": { "id": "2" },
+	"defined": true
+}
+```
+
+- Any other error is `isError` with `INTERNAL_SERVER_ERROR` and no details.
+  Log it with the `onError` option.
+
+## Merge Tools
+
+A model reads every tool's definition before calling any, so a large API
+fills its context. `mergeTools()` replaces them with two tools whose size
+doesn't grow:
+
+```ts
+const { findRoutes, callRoute } = mergeTools(tools);
+const agentTools = [findRoutes, callRoute];
+```
+
+- `find_routes` lists tools whose name, title or description contains every
+  word of a query, and returns the definitions of tools it's asked for.
+- `call_route` calls a tool by name.
+- Keep frequently used tools next to them:
+  `[...tools.filter(isFrequent), findRoutes, callRoute]`.
+- Two tools with the same name throw.
+
+To search another way, such as by tag, write your own find tool and pair it
+with `callRoute`.
+
+## Options
+
+```ts
+type CreateToolsFromRoutesOptions = {
+	/** Converts schemas to JSON Schema. Without it, every argument accepts any value. */
+	schemaConverter?: (
+		schema: StandardSchemaV1,
+		mode: "input" | "output",
+	) => Record<string, unknown> | undefined;
+	/**
+	 * Called with each error a call returns. An error that isn't a `RouteError`
+	 * arrives as `INTERNAL_SERVER_ERROR` with the original as its `cause`.
+	 */
+	onError?: (error: RouteError) => void;
+};
+```

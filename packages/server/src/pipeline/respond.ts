@@ -7,7 +7,7 @@ const respondBrand = Symbol("rest-rpc.respond");
 /**
  * Options of a response returned with {@link respond}.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#responses}
  */
 export type RespondOptions = {
 	/**
@@ -33,7 +33,7 @@ export type RespondOptions = {
 /**
  * A response returned with {@link respond}.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#responses}
  */
 export type ResponseEnvelope<TBody, TOptions extends object> = TOptions &
 	ResponseEnvelopeBase<TBody>;
@@ -72,7 +72,7 @@ export type RespondBodyCheck<TBody> = [Extract<TBody, Response>] extends [never]
  * @remarks Any other value a handler returns is the response body, so only
  * `respond()` results are read as responses. An `undefined` body sends no body.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#responses}
  */
 export function respond<TBody, const TOptions extends RespondOptions = {}>(
 	body: TBody & RespondBodyCheck<TBody>,

@@ -74,7 +74,7 @@ export type InferClientResponse<T extends ClientTypeSource> =
  * function or a route. Pass a client or route tree to infer a matching tree of
  * types.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#handle-errors-on-the-client}
  */
 export type InferClientError<T extends ClientTypeSource> =
 	T extends ClientRouteFunction
@@ -109,7 +109,7 @@ export type DefinedErrorIn<T extends ClientTypeSource> = T extends
  * Pass a client or route tree to infer a matching tree of event data types.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#consume-streams}
+ * @see {@link https://rest-rpc.vercel.app/docs/server-sent-events#read-events}
  */
 export type InferClientStreamData<T extends ClientTypeSource> =
 	T extends ClientRouteFunction

@@ -27,7 +27,7 @@ export type NodeAppContext<TContext extends object> =
 /**
  * Customizes the routes, request parsing and interceptors of a Node app.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#app-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#options}
  */
 export type CreateNodeAppOptions<TContext extends object = EmptyObject> =
 	CreateRouteHandlersOptions & {
@@ -53,7 +53,7 @@ export type CreateNodeAppOptions<TContext extends object = EmptyObject> =
  * A Node request listener that serves a route tree, to pass to
  * `http.createServer()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#create-an-app}
  */
 export type NodeApp = (
 	request: IncomingMessage,
@@ -70,7 +70,7 @@ export type NodeApp = (
  * close the connection instead when the response already started. Use {@link createRouteHandlers} and
  * {@link createCatchAllHandler} instead to serve the routes from a framework.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#create-an-app}
  */
 export function createApp<
 	TRouter extends RuntimeImplementationTree<EmptyObject>,
@@ -82,7 +82,7 @@ export function createApp<
  * Creates a Node request listener that serves a route tree whose routes
  * require initial context, so `context` is required.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#create-an-app}
  */
 export function createApp<TRouter extends RuntimeImplementationTree>(
 	router: TRouter,

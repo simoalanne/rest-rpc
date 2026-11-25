@@ -1,13 +1,12 @@
 ---
 title: Type-safe REST APIs, for developers and agents.
-description: Write a route once. It is your server handler, typed client, TanStack Query options and a tool for MCP servers and Agent SDKs.
+description: Write a route once, and it's a validated HTTP endpoint, a typed client call, TanStack Query options, an OpenAPI operation and a tool for MCP servers and agent SDKs.
 sidebar:
   label: Introduction
 ---
 
-Types connect all of it. Most mistakes fail to compile, and changing a route
-fails every call that no longer fits it, so the compiler shows what a change
-breaks before anything runs.
+Types connect all of it, so the compiler shows what a change breaks before
+anything runs. See [Type Safety](/docs/design/type-safety).
 
 ## One Route, Every Consumer
 
@@ -201,7 +200,7 @@ create.mutate({ body: { title: "Hello", body: "First post" } });
 
 </Tab>
 
-<Tab title="Agent Tool">
+<Tab title="MCP and Agent SDK Tools">
 
 ```ts twoslash
 // ---cut-start---
@@ -368,40 +367,14 @@ if (response.status === 200) {
 }
 ```
 
-Refactors work the same way: rename a field the handler returns, and every
-client and query that reads it stops compiling until it is updated. For a
-coding agent, `tsc` is the check that its change is complete.
-
-## Why rest-rpc
-
-<CardGroup cols={2}>
-	<Card title="Type safety at every step" icon="shield-check" type="check">
-		Params, query, headers, bodies, statuses and errors are typed from the route
-		to the handler and the client. Schemas validate the same values at runtime,
-		with Zod, Valibot, ArkType or any Standard Schema.
-	</Card>
-	<Card title="One source of truth" icon="route" type="check">
-		The route is the handler, client, query options, OpenAPI operation and agent
-		tool. Shared logic such as authentication is a builder that routes are built
-		from, written once instead of wired into every route.
-	</Card>
-	<Card title="Just HTTP" icon="globe" type="check">
-		No new protocol. Methods, paths, query, headers, status codes, content types
-		and streams are what they look like, and an existing endpoint in any
-		framework maps to a route one to one.
-	</Card>
-	<Card title="Small and obvious" icon="braces" type="check">
-		If you can write an REST API, you can read a route. The API is small, with
-		one way to do each thing and few concepts of its own, which makes it quick
-		to learn for developers and hard to misuse for agents.
-	</Card>
-</CardGroup>
+Rename a field the handler returns, and every client and query that reads it
+stops compiling until it's updated. For a coding agent, `tsc` is the check
+that its change is complete.
 
 ## Write Shared Logic Once
 
-Routes compose. A builder holds what a group of routes shares, such as
-context, errors and middleware, and every route built from it inherits them,
-typed:
+A builder holds what a group of routes shares, such as context, errors and
+middleware. Every route built from it inherits them, typed:
 
 ```ts
 const authenticated = route
@@ -423,70 +396,36 @@ const router = {
 };
 ```
 
-See [Middleware](/docs/middleware).
-
 ## Fits What You Have
 
-`rest-rpc` follows existing standards and types the API boundary, and leaves
-the rest to your stack:
-
-- **Runtimes**: Fetch `Request` and `Response` on Bun, Deno and Cloudflare
-  Workers, or Node's `IncomingMessage` and `ServerResponse`.
-- **Frameworks**: serve routes with a one-line server, mount them under one
-  route, or register each one on Express, Hono, Fastify or others. See
-  [Serving Routes](/docs/server/overview).
-- **Standards**: Standard Schema for validation, OpenAPI for documentation and
-  MCP for agents.
-
-There is no built-in authentication, caching or dependency injection. Keep your
-framework's features, add a package, or build them on
-[middleware and context](/docs/middleware). Adopt it one step at a time, each
-useful without the next:
-
-1. Define routes and infer request and response types for handlers you write.
-2. Validate requests and responses at runtime.
-3. Extract a contract and call the routes with the typed client.
-4. Serve the routes with a one-line server, mount the catch-all handler, or
-   register them on your framework's router.
+- **Just HTTP**: methods, paths, query, headers, statuses and content types
+  are what they look like. Any HTTP client can call the routes.
+- **Any runtime**: Bun, Deno, Cloudflare Workers and Node.
+- **Any framework or none**: serve routes with `createApp`, or from Hono,
+  Express, Fastify and others. Routes are the same either way.
+- **Any schema library**: Zod, Valibot, ArkType or any Standard Schema.
+- **Primitives over features**: authentication, caching and dependency
+  injection are a few lines of middleware and context, written your way,
+  instead of built-in features to configure.
 
 ## Get Started
 
 <CardGroup cols={2}>
-	<Card
-		title="Start building"
-		href="/docs/quickstart/"
-		icon="rocket"
-		cta="Open the quickstart"
-	>
-		Define HTTP routes with handlers and call them from a typed client.
+	<Card title="Quickstart" href="/docs/quickstart/" icon="rocket">
+		Define routes and call them from a typed client.
 	</Card>
-	<Card
-		title="Learn the route builder"
-		href="/docs/route-builder/"
-		icon="map"
-		cta="Explore route definitions"
-	>
-		Describe requests, responses, errors and streams in one builder.
+	<Card title="Route Builder" href="/docs/route-builder/" icon="map">
+		Requests, responses, errors and streams.
 	</Card>
-	<Card
-		title="Give agents tools"
-		href="/docs/mcp-tools/"
-		icon="bot"
-		cta="View MCP tools"
-	>
-		Serve the same routes to agents over MCP or an agent SDK.
+	<Card title="MCP Tools" href="/docs/tooling/mcp-tools/" icon="bot">
+		Serve the same routes to agents.
 	</Card>
-	<Card
-		title="Generate OpenAPI"
-		href="/docs/openapi/"
-		icon="file-json"
-		cta="View OpenAPI docs"
-	>
-		Generate an OpenAPI document from your route schemas and metadata.
+	<Card title="OpenAPI" href="/docs/tooling/openapi/" icon="file-json">
+		Generate an OpenAPI document from your routes.
 	</Card>
 </CardGroup>
 
-For coding agents, you can install the `rest-rpc` skill, which points them to the
+For coding agents, install the `rest-rpc` skill. It points them to the
 cheatsheet that ships with each package:
 
 ```package-install
@@ -496,47 +435,24 @@ npx skills add simoalanne/rest-rpc
 ## Common Questions
 
 <Accordion>
-	<AccordionItem title="Who is rest-rpc for?">
-		Teams that want an REST API whose types they can trust end to end, from the
-		handler to the browser, without giving up REST or their framework, and that
-		want the code to stay easy to change, by hand or by an agent.
-	</AccordionItem>
-	<AccordionItem title="What makes it good for coding agents?">
-		Agents need to check their work. Because the route connects server and
-		clients through types, a type check shows whether a change is complete. The
-		API is small, with one obvious way to do each thing, so generated code looks
-		like the docs, and the skill, the cheatsheet and llms.txt give agents the
-		docs of the installed version.
-	</AccordionItem>
 	<AccordionItem title="Do I have to restructure my app?">
-		No. Keep your framework, middleware, authentication, database access, and
-		deployment model. Add typed routes at the API boundary and adopt the client,
-		TanStack Query utils, OpenAPI generation or agent tools as they become
-		useful.
+		No. Keep your authentication, database access and deployment, and your
+		framework if you have one. Add typed routes at the API boundary, and adopt
+		the client, TanStack Query, OpenAPI, or MCP server and agent SDK tools when
+		they're useful.
 	</AccordionItem>
 	<AccordionItem title="Do I need a server framework?">
-		No. If an app only needs typed, validated endpoints, serve them with a
-		one-line server on Node HTTP, Bun, Deno, or Cloudflare Workers. If it needs
-		a framework for other reasons, register the routes on the framework's router
-		instead. Routes do not depend on how they are served, so you can change this
-		later without changing them.
-	</AccordionItem>
-	<AccordionItem title="Do I need to learn a new API model?">
-		No. The model is ordinary HTTP: methods, paths, request locations, status
-		codes, headers, and response bodies. The route builder describes them
-		directly, with sensible defaults for methods, paths, and success statuses.
-		Calling a route from the client feels like a function call, and the request
-		it sends is the one you defined.
+		No, any framework or none works. `createApp` serves routes without one, and
+		any framework can serve them instead. Routes don't change, so you can switch
+		later.
 	</AccordionItem>
 	<AccordionItem title="Can I have a separate contract?">
-		Yes. Define the HTTP interface independently, implement it with
-		`@rest-rpc/server`, and share it directly with clients. See the
-		[Contract-first Quickstart](/docs/contract-first-quickstart/).
+		Yes. Define the interface on its own, implement it on the server, and share
+		it with clients. See [Contract-first](/docs/contract-first/).
 	</AccordionItem>
-	<AccordionItem title="What happens when something breaks?">
-		You debug the same boundary you would debug by hand: method, path, query,
-		headers, body, status, and response shape. Because those pieces live in one
-		route definition, type errors and validation errors point back to that
-		definition.
+	<AccordionItem title="What makes it good for coding agents?">
+		A type check shows whether a change is complete, and the API has one obvious
+		way to do each thing, so generated code looks like the docs. The skill, the
+		cheatsheet and llms.txt give agents the docs of the installed version.
 	</AccordionItem>
 </Accordion>

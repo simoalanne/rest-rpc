@@ -27,7 +27,7 @@ export interface DefaultMeta {}
 /**
  * The OpenAPI operation fields of a route, set with `.openAPI()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/openapi#operation-details}
+ * @see {@link https://rest-rpc.vercel.app/docs/tooling/openapi#describe-routes}
  */
 export type OpenApiRouteOptions = {
 	/** A short summary of what the operation does. */

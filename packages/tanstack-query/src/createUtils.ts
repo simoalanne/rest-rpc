@@ -181,7 +181,7 @@ const mapClientRoutes = (node: unknown, path: readonly unknown[]): unknown =>
  * framework-specific hooks. Every node of the tree has `key()`, the key that
  * matches all of its queries, so `key` is reserved in the client tree.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query}
  */
 export function createTanstackQueryUtils<TClient extends TanstackQueryClient>(
 	client: TClient & ReservedKeyCheck<TClient>,

@@ -6,7 +6,7 @@ import type { SseOptions } from "./sse.ts";
  * Customizes request parsing and validation of route
  * handlers and catch-all handlers.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/overview#route-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/overview#options}
  */
 export type CreateRouteHandlersOptions = {
 	/**
@@ -84,7 +84,7 @@ export type HandleOptions<TContext extends object = EmptyObject> =
 /**
  * Per-request options for the catch-all handler.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#mount-path}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
 export type CatchAllHandleOptions<TContext extends object = EmptyObject> =
 	HandleOptions<TContext> & {

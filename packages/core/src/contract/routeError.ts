@@ -8,7 +8,7 @@ import type { ClientTypeSource, DefinedErrorIn } from "../client/response.ts";
 /**
  * Options accepted by the `RouteError` constructor.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors}
  */
 export type RouteErrorOptions<
 	TData = unknown,
@@ -34,7 +34,7 @@ export type RouteErrorOptions<
  * `RouteError` for every error response with a `code`, and mark the ones the
  * route defines with `isDefined`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors}
  */
 export class RouteError<
 	TCode extends string = string,
@@ -95,7 +95,7 @@ export class RouteError<
  * }
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#handle-errors-on-the-client}
  */
 export function isDefinedError<T>(
 	error: T,
@@ -126,7 +126,7 @@ export type RouteErrorDefinition = {
 /**
  * Options of `routeError` and the route builder's `.error()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#define-and-throw}
  */
 export type RouteErrorDefinitionOptions = {
 	/** HTTP status of the error, from 400 to 599. @default 400 */
@@ -229,7 +229,7 @@ export type RouteErrorClassFor<
  * throw new UserNotFound({ data: { id: "42" } });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#define-and-throw}
  */
 export function routeError<
 	const TCode extends string,
@@ -294,7 +294,7 @@ export function routeError<
  *
  * @remarks Define it with `.error()` to make clients recognize it.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/errors#built-in-errors}
  */
 export const InternalServerError = routeError("INTERNAL_SERVER_ERROR", {
 	status: 500,

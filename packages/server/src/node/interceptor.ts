@@ -21,7 +21,7 @@ import { writeNodeResponse } from "./response.ts";
  * {@link writeErrorResponse}, or closes the connection when the response
  * already started, and finishing without a response is an error.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#interceptors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#node}
  */
 export type NodeInterceptor = (args: {
 	request: IncomingMessage;
@@ -52,7 +52,7 @@ export type NodeInterceptor = (args: {
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#interceptors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#node}
  */
 export function interceptor(interceptor: NodeInterceptor): NodeInterceptor {
 	return interceptor;
@@ -101,7 +101,7 @@ export const intercept = (
  * );
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#interceptors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#node}
  */
 export function writeErrorResponse(
 	response: ServerResponse,
@@ -129,7 +129,7 @@ export function writeErrorResponse(
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#interceptors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#node}
  */
 export function onError(
 	callback: (

@@ -1,7 +1,7 @@
 {
 	"name": "@rest-rpc/server",
 	"version": "0.7.0",
-	"description": "Type-safe HTTP routes that are server handlers, typed clients and agent tools, for Fetch and Node runtimes.",
+	"description": "Type-safe HTTP routes that are server handlers, typed clients, and MCP server and agent SDK tools, for Fetch and Node runtimes.",
 	"keywords": [
 		"agent-tools",
 		"bun",

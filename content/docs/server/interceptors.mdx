@@ -3,21 +3,9 @@ title: Interceptors
 description: Run code around every request the app serves.
 ---
 
-An interceptor is a function around everything the app does for a request. It
-receives the request and the matched route, calls `next()` for the rest, and
-returns the response. Interceptors are for app-wide work that rest-rpc leaves
-to the app, such as API keys, CORS, rate limits or logging. Per-route logic
-with typed context belongs in [middleware](/docs/middleware). Served from a
-[framework](/docs/server/framework-integration), the framework's own
-middleware often does the same job.
-
-The [client](/docs/client/fetch-client#interceptors) has interceptors with the
-same shape around each HTTP exchange.
-
-## Write an Interceptor
-
-`interceptor()` types the function and returns it unchanged. Pass interceptors
-to `createApp` in `interceptors`:
+An interceptor wraps every request, for app-wide work such as API keys, CORS,
+rate limits or logging. For per-route logic with typed context, use
+[middleware](/docs/middleware).
 
 ```ts
 import { createApp, interceptor } from "@rest-rpc/server";
@@ -34,65 +22,38 @@ export default createApp(router, { interceptors: [logging] });
 ```ts
 type Interceptor = (args: {
 	request: Request;
-	/**
-	 * The matched route's definition, with its `path` and `meta`, or
-	 * `undefined` when no route matches the request.
-	 */
+	/** The matched route's definition, or `undefined` when none matches. */
 	route: InterceptedRoute | undefined;
 	/**
-	 * What the runtime passed to `fetch` after the request, such as the `env`
-	 * of Cloudflare Workers. Untyped, so narrow them where they are read:
-	 * `const [env] = args as [Env]`.
+	 * What the runtime passed after the request, such as Cloudflare Workers'
+	 * `env`. Untyped: `const [env] = args as [Env]`.
 	 */
 	args: readonly unknown[];
 	/**
-	 * Handles the request with the later interceptors and the route. Pass
-	 * another request to continue with it, such as one with other headers.
-	 * Routing is not repeated, so keep its URL and method.
+	 * Runs the later interceptors and the route. Pass a request to continue
+	 * with it instead, keeping its URL and method.
 	 */
 	next: (request?: Request) => Promise<Response>;
 }) => Response | Promise<Response>;
 ```
 
-An interceptor that returns a `Response` without calling `next()` answers the
-request itself, and one that throws sends an error.
-
-## Order
-
-The app matches the route first, then runs the interceptors in order, the
-first outermost. The last one's `next()` runs the route: the
-[context](/docs/middleware#values-from-the-host) function, request validation,
-middleware and the handler. `next()` resolves when the response starts, before
-its body streams.
-
-Interceptors run for every request, including ones that match no route, except
-for [static routes](/docs/route-builder#static-responses), which are sent as
-they are.
+- Interceptors run in order, the first outermost, after the route is matched
+  and before anything else, including the `context` function.
+- They run for unmatched requests too, but not for
+  [static routes](/docs/route-builder#static-responses).
+- Return a `Response` without calling `next()` to answer the request
+  yourself, or throw to send an error.
+- `next()` resolves when the response starts, before a streamed body is sent.
 
 ## Errors
 
-`next()` resolves with the responses the route sends, and rejects with every
-error thrown after the interceptor:
+`next()` rejects with any error thrown after the interceptor, including
+`NOT_FOUND` and request validation failures. A response that fails validation
+rejects with `INTERNAL_SERVER_ERROR`, with the issues as its `cause`.
 
-- A `RouteError` rejects as it's sent, with its status, `data` and headers.
-  This includes request validation failures, `NOT_FOUND` when no route
-  matches, and the route's own errors, which keep their class.
-- A response that fails validation rejects with an `INTERNAL_SERVER_ERROR`
-  whose `cause` has the issues.
-- Anything else rejects unchanged.
-
-An interceptor sends an error by throwing it, and a `RouteError` is sent with
-its own status. It isn't checked against the route, so to send a code the
-route [defines](/docs/http-behavior/errors#defined-and-undefined-errors),
-throw the route's own error class.
-
-## Sending Errors
-
-What no interceptor catches, the app sends with `errorResponse(error)`: a
-`RouteError` as a JSON `{ code, message, data? }` response with its status,
-and anything else as an `INTERNAL_SERVER_ERROR`. An interceptor that catches
-with it sends errors earlier, so the interceptors before it receive error
-responses instead of rejections:
+What no interceptor catches is sent as an [error response](/docs/errors). To
+make earlier interceptors see error responses instead of rejections, such as
+for CORS headers, catch with `errorResponse`:
 
 ```ts
 import { createApp, errorResponse, interceptor } from "@rest-rpc/server";
@@ -106,12 +67,16 @@ createApp(router, {
 });
 ```
 
-## Reporting Errors
+:::note
+An error an interceptor throws isn't checked against the route. To send an
+error the route defines, throw the route's own error class.
+:::
 
-`onError(callback)` creates an interceptor that calls `callback` with every
-error thrown after it, and then rethrows it. That includes a
-[Server-Sent Events](/docs/server-sent-events) stream that fails after the
-response started. Place it after interceptors that turn errors into responses:
+### Report Errors
+
+`onError()` creates an interceptor that calls back with every error thrown
+after it, including a stream that fails after it started, and rethrows it.
+Place it after interceptors that turn errors into responses:
 
 ```ts
 import { onError } from "@rest-rpc/server";
@@ -121,6 +86,36 @@ const report = onError((error, { request, route }) => {
 });
 ```
 
-`onError` doesn't report other bodies that fail while they stream, such as a
-raw `ReadableStream` or a returned `Response`. On
-[Node](/docs/server/node#interceptors), it reports every body.
+## Node
+
+Import `interceptor`, `onError` and `writeErrorResponse` from
+`@rest-rpc/server/node`. Node interceptors write to the `ServerResponse`
+instead of returning a `Response`:
+
+```ts
+import {
+	createApp,
+	interceptor,
+	writeErrorResponse,
+} from "@rest-rpc/server/node";
+
+const requestId = interceptor(({ response, next }) => {
+	response.setHeader("x-request-id", crypto.randomUUID());
+	return next();
+});
+
+const sendErrors = interceptor(({ response, next }) =>
+	next().catch((error) => {
+		if (response.headersSent) throw error;
+		return writeErrorResponse(response, error);
+	}),
+);
+```
+
+- Headers set before `next()` are sent with every response, errors included.
+- `next()` resolves once the response is written, and rejects when a stream
+  fails after it started.
+- A written response can't change. To answer the request yourself, write
+  the response and don't call `next()`.
+- `onError` reports bodies that fail while streaming. On Fetch, it only
+  reports failing Server-Sent Events streams.

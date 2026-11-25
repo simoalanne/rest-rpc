@@ -1,22 +1,17 @@
 # rest-rpc
 
-Type-safe REST APIs, for developers and agents. Write a route once with the
-route builder, and the same route is a validated HTTP endpoint, a typed fetch
-client, TanStack Query options, an agent tool, and an in-process call for
-tests. Below are the common patterns, each a complete example. See the
-[documentation](https://rest-rpc.vercel.app/docs/quickstart) for the rest.
-For agents, [llms.txt](https://rest-rpc.vercel.app/llms.txt) lists every
-docs page and the ways to fetch them.
+Type-safe REST APIs, for developers and agents. Write a route once, and it's a
+validated HTTP endpoint, a typed client call, TanStack Query options, an
+OpenAPI operation and a tool for MCP servers and agent SDKs. Below are the common patterns, each a complete example. See the
+[documentation](https://rest-rpc.vercel.app/docs/quickstart) for the rest, or
+[llms.txt](https://rest-rpc.vercel.app/llms.txt) for agents.
 
-| Package                                                                         | Contains                                                                        |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core)                     | Contracts, Fetch client, contract extraction, OpenAPI                           |
-| [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server)                 | Route builder and handlers for Fetch runtimes, `@rest-rpc/server/node` for Node |
-| [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query) | TanStack Query options and keys                                                 |
-
-Server code, its tests included, imports from `@rest-rpc/server`, which
-re-exports what it needs from `@rest-rpc/core`. Client code imports
-`@rest-rpc/core`.
+- [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server): routes and
+  serving. Server code, tests included, imports only this package.
+- [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core): the client,
+  contracts and OpenAPI. Client code imports this package.
+- [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query):
+  TanStack Query options and keys.
 
 ## Contents
 
@@ -38,7 +33,6 @@ re-exports what it needs from `@rest-rpc/core`. Client code imports
 - [Browser Clients](#browser-clients)
 - [Client Options](#client-options)
 - [TanStack Query](#tanstack-query)
-- [Direct Calls from TanStack Query Utils](#direct-calls-from-tanstack-query-utils)
 - [Contract-first](#contract-first)
 - [Local Calls](#local-calls)
 - [OpenAPI](#openapi)
@@ -71,10 +65,10 @@ console.log(status, body.message); // 200 "Hello", typed from the handler
 
 ## Methods and Paths
 
-A route without a method is a `POST` at its keys in the route tree. `:name`
-segments are string params.
+A route without a method is a `POST`, and without a path it's at its keys in
+the route tree. `:name` segments are string params.
 
-See [Route Builder](https://rest-rpc.vercel.app/docs/route-builder#choose-a-method-and-path)
+See [Route Builder](https://rest-rpc.vercel.app/docs/route-builder#method-and-path)
 
 ```ts
 import { route } from "@rest-rpc/server";
@@ -97,10 +91,9 @@ export const router = {
 
 ## Request Validation
 
-Params, query, headers and body are validated before the handler runs, with
-any [Standard Schema](https://standardschema.dev) such as Zod, Valibot or
-ArkType, and an invalid request gets a `400`. Params, query and headers arrive
-as strings, so their schemas coerce.
+Requests are validated before the handler runs, with any Standard Schema such
+as Zod, Valibot or ArkType. An invalid request gets a `400`. Params, query and
+headers arrive as strings, so their schemas coerce.
 
 See [Validation](https://rest-rpc.vercel.app/docs/http-behavior/validation)
 
@@ -128,10 +121,9 @@ const search = route
 
 ## Status, Headers and Cookies
 
-Return the body, or `respond()` to set the rest of the response. The client
-receives them with lowercase header names.
+Return the body, or `respond()` to also set the status, headers or cookies.
 
-See [Return Responses](https://rest-rpc.vercel.app/docs/route-builder#return-responses)
+See [Responses](https://rest-rpc.vercel.app/docs/route-builder#responses)
 
 ```ts
 import { createApp, createClient, route } from "@rest-rpc/server";
@@ -169,10 +161,10 @@ console.log(status, headers.location); // 201 "/posts/..."
 
 ## Defined Responses
 
-Responses are inferred from the handler. Define them to validate them at
-runtime and document them in OpenAPI.
+Without `.response()`, responses are inferred from the handler and not
+validated. Define them to validate them and document them in OpenAPI.
 
-See [Define Responses](https://rest-rpc.vercel.app/docs/route-builder#define-responses)
+See [Defined Responses](https://rest-rpc.vercel.app/docs/route-builder#defined-responses)
 
 ```ts
 import { route } from "@rest-rpc/server";
@@ -183,26 +175,18 @@ const post = z.object({ id: z.string(), title: z.string(), body: z.string() });
 const create = route
 	.post("/posts")
 	.body(z.object({ title: z.string(), body: z.string() }))
-	.response(post, { status: 201, headers: z.object({ location: z.string() }) })
-	.handler(({ body, respond }) => {
-		const created = {
-			id: crypto.randomUUID(),
-			title: body.title,
-			body: body.body,
-		};
-		return respond(created, {
-			status: 201,
-			headers: { location: `/posts/${created.id}` },
-		});
-	});
+	.response(post, { status: 201 })
+	.handler(({ body, respond }) =>
+		respond({ id: crypto.randomUUID(), ...body }, { status: 201 }),
+	);
 ```
 
 ## Errors
 
-Errors are thrown. A defined error is typed on the client, and any other
-`RouteError` is still sent with its status.
+Errors are thrown. An error the route defines is typed on the client, with its
+code and `data`.
 
-See [Errors](https://rest-rpc.vercel.app/docs/http-behavior/errors)
+See [Errors](https://rest-rpc.vercel.app/docs/errors)
 
 ```ts
 import {
@@ -244,10 +228,9 @@ else console.log(data.body.title);
 
 ## Shared Errors
 
-`routeError()` defines an error once, to throw it from any code and add it to
-routes.
+`routeError()` defines an error once, to throw from any code and add to routes.
 
-See [Define Errors](https://rest-rpc.vercel.app/docs/route-builder#define-errors)
+See [Errors Outside Handlers](https://rest-rpc.vercel.app/docs/errors#outside-handlers)
 
 ```ts
 import { route, routeError } from "@rest-rpc/server";
@@ -274,11 +257,11 @@ const get = route
 
 ## Middleware, Context and Metadata
 
-Middleware runs after validation, around the handler, and passes typed values
-to it through context. Initial context comes from the host, and routes describe
-themselves to shared middleware with metadata of a declared shape.
+Middleware runs around the handler and passes it values through `context`.
+The server provides initial context, and metadata tells shared middleware
+about each route.
 
-See [Middleware](https://rest-rpc.vercel.app/docs/middleware)
+See [Middleware and Context](https://rest-rpc.vercel.app/docs/middleware)
 
 ```ts
 import { createApp, route } from "@rest-rpc/server";
@@ -351,39 +334,47 @@ for await (const event of body) console.log(event.id, event.data.message);
 
 ## Content Types
 
-A body is JSON unless a `content-type` header says otherwise, and `FormData`
-is always `multipart/form-data`. The header's media type selects one of these
-built-in codecs, each exported the same way from `@rest-rpc/server` and
-`@rest-rpc/core`.
+A body is JSON unless its `content-type` header says otherwise. `FormData` is
+always sent as `multipart/form-data`, and a binary body arrives as a `Blob`.
 
-See [Encoding and Content Types](https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs)
+See [Content Types and Codecs](https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies)
 
 ```ts
-import {
-	jsonCodec, // application/json and +json: any value JSON.stringify encodes
-	urlEncodedCodec, // application/x-www-form-urlencoded: URLSearchParams
-	formDataCodec, // multipart/form-data: FormData
-	textCodec, // text/*: strings, decoded as UTF-8
-	binaryCodec, // any other media type: Blob, Uint8Array, ReadableStream or async iterable, received as a Blob
-} from "@rest-rpc/server";
+import { createApp, createClient, route } from "@rest-rpc/server";
+import * as z from "zod";
+
+const router = {
+	upload: route
+		.post("/upload")
+		.body(z.instanceof(FormData))
+		.handler(({ body, respond }) =>
+			respond(`Got ${body.getAll("file").length} file(s)`, {
+				headers: { "content-type": "text/plain" },
+			}),
+		),
+};
+
+const app = createApp(router);
+const client = createClient(router, {
+	origin: "http://localhost",
+	fetch: app.fetch,
+});
+
+const form = new FormData();
+form.set("file", new Blob(["Hello"]), "hello.txt");
+const { body } = await client.upload({ body: form });
+console.log(body); // "Got 1 file(s)"
 ```
 
 ## Codecs
 
-A codec encodes another format. Pass the same codec in `bodyCodecs` to the
-client and the server. Custom codecs are selected before the built-in ones.
+A codec sends another format, such as superjson to keep `Date` values. Pass
+the same codecs to the client and the server.
 
 See [Custom Codecs](https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs)
 
 ```ts
-import {
-	binaryCodec,
-	bodyCodec,
-	createApp,
-	createClient,
-	route,
-	serializedBody,
-} from "@rest-rpc/server";
+import { bodyCodec, createApp, createClient, route } from "@rest-rpc/server";
 import superjson from "superjson";
 
 const superjsonCodec = bodyCodec("application/vnd.superjson+json", {
@@ -391,36 +382,18 @@ const superjsonCodec = bodyCodec("application/vnd.superjson+json", {
 	deserialize: async (body) => superjson.parse(await body.text()),
 });
 
-const bytes = bodyCodec("application/octet-stream", {
-	serialize: (value) =>
-		value instanceof Uint8Array
-			? serializedBody(value, { headers: { "x-body": "uint8array" } })
-			: binaryCodec.serialize(value),
-	deserialize: async (body, headers) =>
-		headers["x-body"] === "uint8array"
-			? new Uint8Array(await body.arrayBuffer())
-			: binaryCodec.deserialize(body),
-});
-
 const router = {
-	posts: {
-		get: route
-			.get("/posts/:id")
-			.handler(({ params, respond }) =>
-				respond(
-					{ id: params.id, publishedAt: new Date() },
-					{ headers: { "content-type": "application/vnd.superjson+json" } },
-				),
+	post: route
+		.get("/post")
+		.handler(({ respond }) =>
+			respond(
+				{ title: "Hello", publishedAt: new Date() },
+				{ headers: { "content-type": "application/vnd.superjson+json" } },
 			),
-		export: route.get("/posts/:id/export").handler(({ respond }) =>
-			respond(new TextEncoder().encode("Hello"), {
-				headers: { "content-type": "application/octet-stream" },
-			}),
 		),
-	},
 };
 
-const bodyCodecs = [superjsonCodec, bytes];
+const bodyCodecs = [superjsonCodec];
 const app = createApp(router, { bodyCodecs });
 const client = createClient(router, {
 	origin: "http://localhost",
@@ -428,18 +401,14 @@ const client = createClient(router, {
 	bodyCodecs,
 });
 
-const { body: post } = await client.posts.get({ params: { id: "post_1" } });
-post.publishedAt; // a Date
-const { body: exported } = await client.posts.export({
-	params: { id: "post_1" },
-});
-exported; // a Uint8Array
+const { body } = await client.post();
+console.log(body.publishedAt instanceof Date); // true
 ```
 
 ## Raw and Static Responses
 
-Return a Fetch `Response` for anything else, such as a redirect. A route that
-always sends the same response is `.static()`, built once.
+Return a Fetch `Response` for what the builder can't describe, such as a
+redirect. A response that never changes is `.static()`, built once at startup.
 
 See [Raw Responses](https://rest-rpc.vercel.app/docs/route-builder#raw-responses)
 
@@ -457,35 +426,24 @@ const health = route.get("/health").static({ ok: true });
 
 ## Interceptors
 
-Interceptors run around every request the app serves, for what rest-rpc
-leaves to the app, such as API keys, CORS and error reporting.
+Interceptors run around every request, for app-wide work such as logging, API
+keys or CORS.
 
 See [Interceptors](https://rest-rpc.vercel.app/docs/server/interceptors)
 
 ```ts
-import {
-	createApp,
-	errorResponse,
-	interceptor,
-	onError,
-	route,
-} from "@rest-rpc/server";
+import { createApp, interceptor, onError, route } from "@rest-rpc/server";
 
-const requestId = interceptor(async ({ next }) => {
+const logging = interceptor(async ({ request, next }) => {
 	const response = await next();
-	const copy = new Response(response.body, response); // its headers may be immutable
-	copy.headers.set("x-request-id", crypto.randomUUID());
-	return copy;
+	console.log(request.method, request.url, response.status);
+	return response;
 });
 
 const router = { hello: route.get("/hello").handler(() => "Hello") };
 
 export default createApp(router, {
-	interceptors: [
-		requestId,
-		interceptor(({ next }) => next().catch(errorResponse)), // errors reach requestId as responses
-		onError((error) => console.error(error)), // errors before the response and in event streams
-	],
+	interceptors: [logging, onError((error) => console.error(error))],
 });
 ```
 
@@ -493,7 +451,7 @@ export default createApp(router, {
 
 `@rest-rpc/server/node` serves the same routes with `node:http`.
 
-See [Node](https://rest-rpc.vercel.app/docs/server/node)
+See [Serving Routes](https://rest-rpc.vercel.app/docs/server/overview)
 
 ```ts
 import { createServer } from "node:http";
@@ -507,8 +465,8 @@ createServer(createApp(router)).listen(3000);
 
 ## Frameworks
 
-Mount the routes in a framework under one route, or register each on the
-framework's router.
+Serve the same routes from any framework: under one of its routes, or each
+registered on its router.
 
 See [Framework Integration](https://rest-rpc.vercel.app/docs/server/framework-integration)
 
@@ -530,10 +488,10 @@ export default app;
 
 ## Browser Clients
 
-A bundler macro runs `extractContract()` at build time and inlines the routes'
-methods, paths, statuses and error codes, so no server code ships. Bun runs
-macros itself, and Vite and other bundlers with `unplugin-macros`. The client
-sections below use these files.
+A bundler macro runs `extractContract()` at build time, so the client gets the
+routes' types without any server code. Bun runs macros itself, and Vite and
+other bundlers with `unplugin-macros`. The client sections below use these
+files.
 
 See [Contract Extraction](https://rest-rpc.vercel.app/docs/client/contract-extraction)
 
@@ -622,7 +580,8 @@ export const client = createClient(getContract(), {
 
 ## TanStack Query
 
-Query and mutation options for each route, with typed keys.
+Query and mutation options for each route, with typed keys. `fetch()` calls a
+route directly, such as in a router loader.
 
 See [TanStack Query](https://rest-rpc.vercel.app/docs/client/tanstack-query)
 
@@ -666,13 +625,6 @@ export function Posts() {
 }
 ```
 
-## Direct Calls from TanStack Query Utils
-
-Call a route through the utils with `fetch()` when TanStack Query is not
-needed, such as in a router loader, so the app keeps only the utils around.
-
-See [Direct Fetch Calls](https://rest-rpc.vercel.app/docs/client/tanstack-query#direct-fetch-calls)
-
 ```ts
 // loaders.ts
 import { queryUtils } from "./client";
@@ -685,8 +637,8 @@ export async function loadPost(id: string) {
 
 ## Contract-first
 
-Define the routes in a shared contract with `@rest-rpc/core`, and implement
-them on the server. The client uses the contract directly, schemas included.
+Define routes in a contract with `@rest-rpc/core`, and implement them on the
+server. The client imports the contract directly.
 
 See [Contract-first](https://rest-rpc.vercel.app/docs/contract-first)
 
@@ -735,9 +687,9 @@ export const client = createClient(contract, { validateResponses: true });
 
 ## Local Calls
 
-`call()` runs one route in process, through validation and middleware, without
-HTTP. To call the app in process with HTTP behavior, pass `app.fetch` to
-`createClient` as in [Hello World](#hello-world).
+`call()` runs one route with its validation and middleware, without HTTP. To
+test the whole app, pass `app.fetch` to the client as in
+[Hello World](#hello-world).
 
 See [Local Calls](https://rest-rpc.vercel.app/docs/client/local-calls)
 
@@ -756,10 +708,10 @@ console.log(body); // 42
 
 ## OpenAPI
 
-An OpenAPI document from the same routes, with a converter for your schema
+Generate an OpenAPI document from the routes, with a converter for your schema
 library.
 
-See [OpenAPI](https://rest-rpc.vercel.app/docs/openapi)
+See [OpenAPI](https://rest-rpc.vercel.app/docs/tooling/openapi)
 
 ```ts
 import { createOpenApiDocument, route } from "@rest-rpc/server";
@@ -787,11 +739,10 @@ const document = createOpenApiDocument(router, {
 
 ## MCP Tools
 
-`createToolsFromRoutes()` turns routes into tools, to register on an MCP server
-or in an agent framework. `mergeTools()` merges them into two tools for an API
-with many routes.
+`createToolsFromRoutes()` turns routes into tools for an MCP server or an agent
+SDK. Each call runs the route with its validation and middleware.
 
-See [MCP Tools](https://rest-rpc.vercel.app/docs/mcp-tools)
+See [MCP Tools](https://rest-rpc.vercel.app/docs/tooling/mcp-tools)
 
 ```ts
 import {
@@ -802,7 +753,6 @@ import {
 import { createApp, createToolsFromRoutes, route } from "@rest-rpc/server";
 import * as z from "zod";
 
-const post = z.object({ id: z.string(), title: z.string(), body: z.string() });
 const posts = [{ id: "1", title: "Hello", body: "First post" }];
 
 const router = {
@@ -810,13 +760,12 @@ const router = {
 		search: route
 			.get("/posts/search")
 			.query(z.object({ text: z.string().describe("Words to find in posts") }))
-			.response(z.object({ posts: z.array(post) }))
 			.openAPI({ summary: "Search posts by their title and body" })
-			.handler(({ query }) => ({
-				posts: posts.filter(({ title, body }) =>
+			.handler(({ query }) =>
+				posts.filter(({ title, body }) =>
 					`${title} ${body}`.includes(query.text),
 				),
-			})),
+			),
 	},
 };
 
@@ -853,8 +802,8 @@ export default {
 
 ## Type Helpers
 
-Reuse a route's types in code outside it, such as a service written apart
-from its route.
+Reuse a route's types outside it, such as in a handler written apart from its
+route.
 
 See [Type Helpers](https://rest-rpc.vercel.app/docs/route-builder#type-helpers)
 

@@ -3,9 +3,9 @@ title: Validation
 description: What is validated, when, and which type each side sees.
 ---
 
-Schemas are [Standard Schema](https://standardschema.dev) schemas, such as Zod,
-Valibot or ArkType, or `type<T>()` for types without validation. One schema
-gives two types, and each side of a route sees one of them:
+Schemas are any [Standard Schema](https://standardschema.dev), such as Zod,
+Valibot or ArkType. A schema has an input type and an output type, and each
+side of a route sees one of them:
 
 ```ts twoslash
 import { createClient } from "@rest-rpc/core";
@@ -29,70 +29,57 @@ const client = createClient({ list }, { origin: "http://localhost" });
 const { body } = await client.list({ query: { page: 1 } });
 ```
 
-| Side                             | Request schemas | Response schemas |
-| -------------------------------- | --------------- | ---------------- |
-| Client call / handler return     | input           | input            |
-| Handler argument / client result | output          | output           |
+- What you send is the **input**: a client call's request, and a handler's
+  return value.
+- What you receive is the **output**: a handler's arguments, and a client
+  call's result.
 
 ## Requests
 
-The server validates params, query, headers and body before middleware and the
-handler run. A failure is answered with
-[`REQUEST_VALIDATION_FAILED`](/docs/http-behavior/errors#built-in-errors) and
-status `400`, with the issues of each location as `data`, and the handler
-doesn't run. Params, query and headers arrive as
-[strings](/docs/http-behavior/encoding#params-query-and-headers), so their
-schemas coerce.
+The server validates params, query, headers and body before middleware and
+the handler run.
 
-A schema that strips unknown keys, such as `z.object()`, passes on only the
-keys it declares. One that keeps them, such as `z.looseObject()`, passes on
-anything the request sent, `__proto__` included, so don't deep-merge such a
-body into another object.
+- A failure is answered with `REQUEST_VALIDATION_FAILED` and status `400`, and
+  the handler doesn't run.
+- Params, query and headers arrive as strings, so their schemas coerce.
+
+:::warning
+A schema that keeps unknown keys, such as `z.looseObject()`, passes on
+anything the request sent, `__proto__` included. Don't deep-merge such a body
+into another object.
+:::
 
 ## Responses
 
-A defined response is validated before it's sent, and a stream each item as
-it's yielded. A failure is a server bug, so the client gets a bare
-`INTERNAL_SERVER_ERROR`, and the issues stay on the server as its `cause`.
-Responses inferred from the handler are type-checked but not validated.
-
-A headers schema is the contract for a response's headers, so what it outputs
-is sent. One that strips unknown keys, such as `z.object()`, sends only the
-headers it declares, and one that keeps them, such as `z.looseObject()`, sends
-the others too. A response or [error](/docs/route-builder#define-errors) without
-a headers schema sends the headers the handler and middleware set.
+- Responses defined with `.response()` are validated before they're sent, and
+  stream events as they're yielded.
+- A failure is a server bug, so the client gets a plain
+  `INTERNAL_SERVER_ERROR`, and the issues stay on the server.
+- Responses inferred from the handler are type-checked but not validated.
+- A headers schema decides which headers are sent. `z.object()` sends only
+  the ones it declares.
 
 ## Disabling Validation
 
-`disableRequestValidation` and `disableResponseValidation` turn schema
-validation off. Everything else still runs, and the types stay as if the
-schemas ran:
-
 ```ts
-const get = route
-	.get("/posts/:id")
-	.params(z.object({ id: z.coerce.number() }))
-	.response(z.object({ title: z.string().default("Untitled") }))
-	.handler(({ params }) => findPost(params.id)); // params.id is the string "1"
-
-createApp(
-	{ posts: { get } },
-	{ disableRequestValidation: true, disableResponseValidation: true },
-);
+createApp(router, {
+	disableRequestValidation: true,
+	disableResponseValidation: true,
+});
 ```
 
-Coercions, transforms and defaults don't apply, a header default such as a
-`content-type` included, and a route with a body accepts any content type.
-[Errors](/docs/http-behavior/errors#defined-and-undefined-errors) are
-validated when they're created, so their `data` and headers are validated
-either way.
-Disable validation only with schemas that don't change values, or use
-`type<T>()` on the routes that need it.
+:::warning
+Coercions, transforms and defaults don't apply, though the types say they
+did. With the route above, `query.page` would be the string `"1"`, or
+`undefined`. Disable validation only with schemas that don't change values.
+:::
+
+- A route with a body accepts any content type.
+- Errors are still validated when they're created.
 
 ## Types Without Validation
 
-`type<T>()` is a schema that only carries a type. An optional function maps
-input to output, and may be async:
+`type<T>()` is a schema that only carries a type:
 
 ```ts
 import { type } from "@rest-rpc/server";
@@ -104,3 +91,5 @@ const create = route
 
 const idToString = type((id: number) => String(id)); // input number, output string
 ```
+
+The optional function maps input to output, and may be async.

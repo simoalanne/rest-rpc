@@ -151,7 +151,7 @@ export class ServerRouteBuilder<
 		return new ServerRouteBuilder(state) as never;
 	}
 
-	/** Attaches the server handler that completes the route. @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses} */
+	/** Attaches the server handler that completes the route. @see {@link https://rest-rpc.vercel.app/docs/route-builder#responses} */
 	handler<
 		const TResult extends AllowedHandlerResult<HandlerRoute<TState>, TContext>,
 	>(

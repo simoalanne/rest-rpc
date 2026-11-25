@@ -1,17 +1,14 @@
 ---
 title: Contract-first
-description: Define routes in a shared contract and implement them separately.
+description: Define routes in a shared contract, implement them on the server, and call them from the client.
 ---
 
-Import `route` from `@rest-rpc/core` to define a route independently
-of its server implementation. The contract can be shared directly with a Fetch
-client and implemented with `@rest-rpc/server`.
+A contract defines the HTTP interface without handlers, so clients can import
+it without any server code. It uses the same builder as
+[implementation-first routes](/docs/route-builder), imported from
+`@rest-rpc/core`.
 
-The definition methods are the same as the [Route Builder](/docs/route-builder).
-The difference is that responses are defined with schemas rather than inferred
-from handlers.
-
-## Define Routes
+## Define the Contract
 
 ```ts contract.ts
 import { route } from "@rest-rpc/core";
@@ -24,7 +21,7 @@ const postSchema = z.object({
 });
 
 const create = route
-	.body(z.object({ title: z.string(), body: z.string() }))
+	.body(z.object({ title: z.string().min(1), body: z.string() }))
 	.response(postSchema);
 
 const get = route
@@ -36,28 +33,23 @@ const get = route
 export const contract = { posts: { create, get } };
 ```
 
-Use `.response()` for each successful response, with `sse(schema)` for
-streams or [`raw()`](/docs/route-builder#raw-responses) for a returned Fetch
-`Response`, and `.error()` for each [error](/docs/route-builder#define-errors).
-These schemas define handler and client types and provide
-[runtime validation](/docs/http-behavior/validation). A contract route has no
-handler to infer its response from, so `implement()` requires at least one
-`.response()`, which can be
-[one without a body](/docs/route-builder#define-responses).
-See [Server-Sent Events](/docs/server-sent-events) for stream handlers.
+- Every route needs at least one `.response()`, since there's no handler to
+  infer it from. Use `sse(schema)` for a stream, and `raw()` for a returned
+  Fetch `Response`.
+- Metadata is part of the contract: set it with `$meta<T>()` and `.meta()`
+  here.
 
-## Implement Routes
+## Implement It
 
-Pass a contract route to `implement()` to get a server route builder for it,
-then attach its handler:
+`implement()` turns a contract route into a server route that needs only a
+handler:
 
 ```ts server.ts
-import { implement } from "@rest-rpc/server";
+import { createApp, implement } from "@rest-rpc/server";
 import { contract } from "./contract.ts";
-import { createPost, findPost } from "./posts.ts";
 
-const create = implement(contract.posts.create).handler(
-	({ body: { title, body } }) => createPost(title, body),
+const create = implement(contract.posts.create).handler(({ body }) =>
+	createPost(body.title, body.body),
 );
 
 const get = implement(contract.posts.get).handler(({ params, errors }) => {
@@ -66,54 +58,48 @@ const get = implement(contract.posts.get).handler(({ params, errors }) => {
 	return post;
 });
 
-export const router = { posts: { create, get } };
+export default createApp({ posts: { create, get } });
 ```
 
-The implementation must match the contract's request segments and defined
-responses, and throw the contract's defined errors. Compile and register the completed routes as usual.
-
-## Context, Middleware and Metadata
-
-[Context, middleware and metadata](/docs/middleware) work as for implementation-first
-routes, with two differences.
-
-`$context<T>()` and `.use()` are called on the `implement()` result, before
-`.handler()`. Pass a contract tree to `implement()` to share them with every
-route in the tree:
+Context and middleware belong to the server, so add them to the
+`implement()` result. Pass a whole contract tree to share them with every
+route in it:
 
 ```ts
 const posts = implement(contract.posts)
 	.$context<{ headers: Headers }>()
-	.use(authenticate); // injects user
+	.use(authenticate); // adds `user` to the context
 
 export const router = {
 	posts: {
 		create: posts.create.handler(({ body, context }) =>
 			createPost(body.title, body.body, context.user),
 		),
-		get: posts.get.handler(({ params, errors }) => {
-			const post = findPost(params.id);
-			if (!post) throw errors.POST_NOT_FOUND();
-			return post;
-		}),
+		get: posts.get.handler(({ params }) => findPost(params.id)),
 	},
 };
 ```
 
-Metadata is part of the contract, so declare its shape with `$meta<T>()` and
-set it with `.meta()` on contract routes. Middleware on the implementation
-reads `route.meta` with the shape of the routes it runs on.
-
-:::error[Reserved Keys]
-Don't use `use` or `$context` as top-level keys of a contract tree passed to `implement()`. They are reserved for the implementer, and using them is a type error.
+:::error[Reserved keys]
+`use` and `$context` can't be top-level keys of a contract tree passed to
+`implement()`. Using them is a type error.
 :::
 
-## Use in a Client
+## Call It
 
-Pass the shared contract directly to `createClient()`, and the client to
-`createTanstackQueryUtils()` if you use TanStack Query. No [contract extraction](/docs/client/contract-extraction)
-step is needed, and the client can [validate responses](/docs/client/fetch-client#response-validation)
-with the contract's schemas.
+Pass the contract to the client as it is:
 
-See the [Contract-first Quickstart](/docs/contract-first-quickstart) for a
-complete example.
+```ts client.ts
+import { createClient } from "@rest-rpc/core";
+import { contract } from "./contract";
+
+const client = createClient(contract, { origin: "http://localhost:3000" });
+
+const created = await client.posts.create({
+	body: { title: "Hello", body: "First post" },
+});
+```
+
+Since the contract has schemas, the client can
+[validate responses](/docs/client/fetch-client#response-validation) with
+them.
