@@ -8,7 +8,6 @@ import {
 	type RouteDefinition,
 } from "@rest-rpc/core/contract";
 import type { RouteError } from "@rest-rpc/core";
-import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "../builder/routeBuilder.types.ts";
 import { readRequestPathname, stripMountPath } from "./requestUrl.ts";
 
@@ -163,10 +162,128 @@ type MatchedRoute<TRoute> = {
 	params: Record<string, string> | undefined;
 };
 
+/** Routes without params, by path and then by method. */
+type StaticRoutes<TRoute> = Map<string, Map<string, TRoute>>;
+
+/** A route registered on a trie node, with its param names in path order. */
+type RouteLeaf<TRoute> = { route: TRoute; paramNames: readonly string[] };
+
+/** Static children are tried before the param child at every depth. */
+type RouteNode<TRoute> = {
+	staticChildren: Map<string, RouteNode<TRoute>>;
+	paramChild: RouteNode<TRoute> | undefined;
+	leaves: Map<string, RouteLeaf<TRoute>>;
+};
+
+const createRouteNode = <TRoute>(): RouteNode<TRoute> => ({
+	staticChildren: new Map(),
+	paramChild: undefined,
+	leaves: new Map(),
+});
+
+const getOrCreate = <TKey, TValue>(
+	map: Map<TKey, TValue>,
+	key: TKey,
+	create: () => TValue,
+) => {
+	let value = map.get(key);
+	if (value === undefined) {
+		value = create();
+		map.set(key, value);
+	}
+	return value;
+};
+
+// The first route registered for a path and method wins.
+const addStaticRoute = <TRoute extends { method: string; path: string }>(
+	staticRoutes: StaticRoutes<TRoute>,
+	route: TRoute,
+) => {
+	const byMethod = getOrCreate(staticRoutes, route.path, () => new Map());
+	if (!byMethod.has(route.method)) byMethod.set(route.method, route);
+};
+
+const addParamRoute = <TRoute extends { method: string; path: string }>(
+	root: RouteNode<TRoute>,
+	route: TRoute,
+) => {
+	let node = root;
+	const paramNames: string[] = [];
+	for (const segment of splitPath(route.path)) {
+		const name = getPathParamSegmentName(segment);
+		if (name === undefined) {
+			node = getOrCreate(node.staticChildren, segment, () =>
+				createRouteNode<TRoute>(),
+			);
+			continue;
+		}
+		if (paramNames.includes(name)) {
+			throw new Error(
+				`Route path "${route.path}" repeats the param "${name}".`,
+			);
+		}
+		paramNames.push(name);
+		node = node.paramChild ??= createRouteNode();
+	}
+	if (!node.leaves.has(route.method)) {
+		node.leaves.set(route.method, { route, paramNames });
+	}
+};
+
+// One trailing slash is ignored, as route paths have none.
+const trimTrailingSlash = (path: string) =>
+	path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+
+// Backtracks to the param child when the static branch has no route for the
+// method, and collects the raw param values in path order.
+const findLeaf = <TRoute>(
+	node: RouteNode<TRoute>,
+	segments: readonly string[],
+	index: number,
+	method: string,
+	values: string[],
+): RouteLeaf<TRoute> | undefined => {
+	if (index === segments.length) return node.leaves.get(method);
+	const segment = segments[index]!;
+	if (segment === "") return undefined;
+	const staticChild = node.staticChildren.get(segment);
+	const staticLeaf =
+		staticChild && findLeaf(staticChild, segments, index + 1, method, values);
+	if (staticLeaf) return staticLeaf;
+	if (!node.paramChild) return undefined;
+	values.push(segment);
+	const paramLeaf = findLeaf(
+		node.paramChild,
+		segments,
+		index + 1,
+		method,
+		values,
+	);
+	if (!paramLeaf) values.pop();
+	return paramLeaf;
+};
+
+// Empty segments are kept, so a path such as `/posts//comments` matches no route.
+const matchParamRoute = <TRoute>(
+	root: RouteNode<TRoute>,
+	method: string,
+	path: string,
+): MatchedRoute<TRoute> | undefined => {
+	const segments = path === "/" ? [] : path.slice(1).split("/");
+	const values: string[] = [];
+	const leaf = findLeaf(root, segments, 0, method, values);
+	if (!leaf) return undefined;
+	const params: Record<string, string> = {};
+	leaf.paramNames.forEach((name, index) => {
+		params[name] = decodePathSegment(values[index]!);
+	});
+	return { route: leaf.route, params };
+};
+
 /**
- * Compiles routes into a matcher using rou3. It matches the path of a request
- * URL or target, without the mount path, and requests outside the mount path
- * are unmatched. A `HEAD` request matches the `GET` route of its path.
+ * Compiles routes into a matcher. It matches the path of a request URL or
+ * target, without the mount path, and requests outside the mount path are
+ * unmatched. A `HEAD` request matches the `GET` route of its path.
  */
 export function createRouteMatcher<
 	TRoute extends { readonly method: string; readonly path: string },
@@ -177,9 +294,16 @@ export function createRouteMatcher<
 	url: string,
 	mountPath?: string,
 ) => MatchedRoute<TRoute> | undefined {
-	const router = createRouter<TRoute>();
+	// Routes without params are matched by their exact path, so only routes
+	// with params go in the trie.
+	const staticRoutes: StaticRoutes<TRoute> = new Map();
+	const root = createRouteNode<TRoute>();
 	for (const route of routes) {
-		addRoute(router, route.method, route.path, route);
+		if (getPathParamNames(route.path).length === 0) {
+			addStaticRoute(staticRoutes, route);
+		} else {
+			addParamRoute(root, route);
+		}
 	}
 
 	return (method, url, mountPath) => {
@@ -188,16 +312,11 @@ export function createRouteMatcher<
 			? stripMountPath(pathname, mountPath)
 			: pathname;
 		if (!routePath) return undefined;
-		const match = findRoute(
-			router,
-			method === "HEAD" ? "GET" : method,
-			routePath,
-		);
-		if (!match) return undefined;
-		// rou3 creates the params per match, so they are decoded in place.
-		const { params } = match;
-		for (const name in params) params[name] = decodePathSegment(params[name]!);
-		return { route: match.data, params };
+		const routeMethod = method === "HEAD" ? "GET" : method;
+		const path = trimTrailingSlash(routePath);
+		const staticRoute = staticRoutes.get(path)?.get(routeMethod);
+		if (staticRoute) return { route: staticRoute, params: undefined };
+		return matchParamRoute(root, routeMethod, path);
 	};
 }
 

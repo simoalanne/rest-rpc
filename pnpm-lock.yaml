@@ -264,9 +264,6 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../core
-      rou3:
-        specifier: ^1.0.0
-        version: 1.0.0
 
   packages/tanstack-query:
     dependencies:
@@ -4141,10 +4138,6 @@ packages:
     resolution: {integrity: sha512-7j1jdVlzWzbRat9EDMsB/QmyMcc6hOO0vbcma8LGjBTmKlpS5Hem+5fpntc/HoRV5tLrG+Qo6I1ZHV/ZuL5S8g==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
-
-  rou3@1.0.0:
-    resolution: {integrity: sha512-ySeaQkSrua+ut9g+65I7FHqOFBaY8tV0FmccXItoq0q21se32Q3u4YiW7/RqXSosWgYJaaKwRHXy3BST9PeCNQ==}
-    engines: {node: '>=20.19.0'}
 
   roughjs@4.6.6:
     resolution: {integrity: sha512-ZUz/69+SYpFN/g/lUlo2FXcIjRkSu3nDarreVdGGndHEBJ6cXPdKguS8JGxwj5HA5xIbVKSmLgr5b3AWxtRfvQ==}
@@ -8720,8 +8713,6 @@ snapshots:
       '@rolldown/binding-wasm32-wasi': 1.3.0
       '@rolldown/binding-win32-arm64-msvc': 1.3.0
       '@rolldown/binding-win32-x64-msvc': 1.3.0
-
-  rou3@1.0.0: {}
 
   roughjs@4.6.6:
     dependencies:
