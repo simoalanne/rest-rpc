@@ -1,5 +1,11 @@
 # @rest-rpc/server
 
+## 0.8.2
+
+### Patch Changes
+
+- 00de494: Declare `next`, `App.fetch` and the operations of built-in codecs as function-typed properties instead of methods, so destructuring them or passing them on, as in `({ next })` and `fetch: app.fetch`, no longer triggers lint rules such as `unbound-method`.
+
 ## 0.8.1
 
 ### Patch Changes
