@@ -114,12 +114,12 @@ export type BuiltInBodyCodec<TSerialized extends BodyValue, TDecoded> = {
 	 * `JSON.stringify`, and the others a `BodySerializationError` for a value
 	 * they don't encode.
 	 */
-	serialize(
+	serialize: (
 		value: unknown,
 		headers?: Readonly<Record<string, string>>,
-	): TSerialized;
-	deserialize(
+	) => TSerialized;
+	deserialize: (
 		body: IncomingBody,
 		headers?: Readonly<Record<string, string>>,
-	): Promise<TDecoded>;
+	) => Promise<TDecoded>;
 };

@@ -491,9 +491,9 @@ export type NextOptions<TInjected extends object> = {
 
 type Controls = {
 	/** Runs later middleware and the handler, and resolves to their response. */
-	next<TInjected extends object = EmptyObject>(
+	next: <TInjected extends object = EmptyObject>(
 		options?: NextOptions<TInjected>,
-	): Promise<NextResponse<TInjected>>;
+	) => Promise<NextResponse<TInjected>>;
 };
 
 type UnknownRequest = {

@@ -69,7 +69,7 @@ export type App<TArgs extends unknown[] = []> = {
 	 * error. The arguments after the request are passed to the `context`
 	 * function.
 	 */
-	fetch(request: Request, ...args: TArgs): Promise<Response>;
+	fetch: (request: Request, ...args: TArgs) => Promise<Response>;
 	/**
 	 * The routes in the format of Bun's `routes` server option, so Bun's
 	 * native router routes requests. Other runtimes ignore it, and `fetch`
